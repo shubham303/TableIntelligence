@@ -11,15 +11,15 @@ not a static per-algorithm label.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import Any, Literal
+
+from pydantic import BaseModel
 
 
 JobStatus = Literal["running", "done", "failed"]
 
 
-@dataclass
-class Job:
+class Job(BaseModel):
     """A single slow-lane job.
 
     Attributes:
@@ -32,6 +32,8 @@ class Job:
     status: JobStatus = "running"
     result: Any = None
     error: str | None = None
+
+    model_config = {"arbitrary_types_allowed": True}
 
 
 class JobRegistry:
