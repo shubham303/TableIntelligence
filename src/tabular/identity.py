@@ -13,13 +13,34 @@ Why SHA-256 over json.dumps?
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
+import sys
 from typing import Any
+
+import numpy as np
+import pandas as pd
+
+
+def _lazy_import(name: str) -> Any:
+    """Return a module that is not loaded until its first attribute is accessed.
+
+    Uses importlib.util.LazyLoader — part of the stdlib since Python 3.5.
+    Safe for simple top-level modules (duckdb, sklearn, etc.). Avoid it for
+    packages that rely on submodule registration during __init__ (e.g. pandas),
+    as the deferred exec can interfere with subpackage wiring.
+    """
+    spec = importlib.util.find_spec(name)
+    loader = importlib.util.LazyLoader(spec.loader)
+    spec.loader = loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    loader.exec_module(module)
+    return module
 
 
 def _json_default(obj: Any) -> Any:
     """Coerce non-JSON-serializable types that appear in params dicts."""
-    import numpy as np
     if isinstance(obj, np.integer):
         return int(obj)
     if isinstance(obj, np.floating):
@@ -64,7 +85,6 @@ def fingerprint_series(series: Any) -> str:
     Returns:
         A 16-character hex string representing the column's content.
     """
-    import pandas as pd
     hashes = pd.util.hash_pandas_object(series, index=False)
     return hashlib.sha256(hashes.values.tobytes()).hexdigest()[:16]
 
@@ -81,6 +101,5 @@ def fingerprint_dataframe(df: Any) -> str:
     Returns:
         A 16-character hex string representing the DataFrame's content.
     """
-    import pandas as pd
     hashes = pd.util.hash_pandas_object(df, index=False)
     return hashlib.sha256(hashes.values.tobytes()).hexdigest()[:16]

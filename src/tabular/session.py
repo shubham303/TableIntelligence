@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .store import Store
+
 
 class Session:
     """State holder for a single-table analysis session.
@@ -34,7 +36,9 @@ class Session:
         Returns:
             A new Session with the table loaded.
         """
-        raise NotImplementedError("planned: see docs/roadmap.md")
+        session = cls()
+        session._store = Store.for_csv(path)
+        return session
 
     def profile(self) -> Any:
         """Profile every column: type, distribution, missingness, cardinality, range.
@@ -180,4 +184,4 @@ class Session:
         Returns:
             Result with query output as a DataFrame.
         """
-        raise NotImplementedError("planned: see docs/roadmap.md")
+        return self._store.run_sql(query)
