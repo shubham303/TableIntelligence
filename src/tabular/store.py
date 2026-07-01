@@ -4,6 +4,10 @@ This module is the only place where columns are added to the table (the
 "materialize-as-column" mechanism). All analytics results that produce new
 data (cluster labels, predictions, reduced dimensions) must write back here
 via write_back_column rather than returning raw arrays.
+
+ibis is used as the query layer so callers work with Python expressions
+rather than raw SQL strings. The DuckDB backend is the sole execution engine;
+ibis.con exposes the underlying duckdb connection for low-level writes.
 """
 from __future__ import annotations
 
@@ -13,7 +17,7 @@ from typing import Any
 from .identity import fingerprint_dataframe, _lazy_import
 from .loader import load
 
-duckdb = _lazy_import("duckdb")
+ibis = _lazy_import("ibis")
 
 _STORE_SUBDIR = Path(".tableint") / "store"
 
@@ -29,10 +33,11 @@ def _csv_fingerprint(csv_path: Path) -> str:
 
 
 class Store:
-    """DuckDB-backed store for a single table.
+    """ibis/DuckDB-backed store for a single table.
 
-    Owns the connection and is the sole writer of columns. Other modules read
-    via run_sql; they never write directly.
+    Owns the ibis backend and is the sole writer of columns. Other modules
+    read via run_sql or the ibis TableExpr at self._table; they never write
+    directly.
 
     Layout on disk:
         <csv_dir>/.tableint/store/<fingerprint>.duckdb
@@ -43,6 +48,10 @@ class Store:
     Internally, the DuckDB file holds:
       - table ``_data``  — all columns plus a ``_ti_row`` integer (0-based row id)
       - view  ``data``   — ``_data`` minus ``_ti_row``; this is what callers query
+
+    Attributes:
+        _ibis:  ibis DuckDB backend (use for ibis expressions and .sql())
+        _table: ibis TableExpr for the user-facing ``data`` view
     """
 
     _registry: dict[str, "Store"] = {}
@@ -51,7 +60,7 @@ class Store:
         if fingerprint in cls._registry:
             return cls._registry[fingerprint]
         instance = super().__new__(cls)
-        instance._conn = None
+        instance._ibis = None
         cls._registry[fingerprint] = instance
         return instance
 
@@ -69,34 +78,32 @@ class Store:
         return store
 
     def _open(self, csv_path: Path, fingerprint: str) -> None:
-        """Open (or reuse) the DuckDB connection and load the CSV if needed."""
-        if self._conn is not None:
+        """Open (or reuse) the ibis/DuckDB connection and load the CSV if needed."""
+        if self._ibis is not None:
             return  # already open
 
         store_dir = csv_path.parent / _STORE_SUBDIR
         store_dir.mkdir(parents=True, exist_ok=True)
         db_path = store_dir / f"{fingerprint}.duckdb"
 
-        self._conn = duckdb.connect(str(db_path))
+        self._ibis = ibis.duckdb.connect(str(db_path))
 
-        tables = {row[0] for row in self._conn.execute("SHOW TABLES").fetchall()}
-        if _INTERNAL not in tables:
-            self._conn.execute(
+        if _INTERNAL not in self._ibis.list_tables():
+            # _ti_row is a stable 0-based row id used by write_back_column.
+            self._ibis.raw_sql(
                 f"CREATE TABLE {_INTERNAL} AS "
                 f"SELECT row_number() OVER () - 1 AS _ti_row, * "
                 f"FROM read_csv_auto('{csv_path}')"
             )
-            self._conn.execute(
+            self._ibis.raw_sql(
                 f"CREATE VIEW {_VIEW} AS "
                 f"SELECT * EXCLUDE (_ti_row) FROM {_INTERNAL}"
             )
 
-    def load_csv(self, path: str) -> None:
-        """Load a CSV file into the DuckDB store.
+        self._table = self._ibis.table(_VIEW)
 
-        Deprecated in favour of Store.for_csv(path); kept so existing call
-        sites in Session continue to work during the transition.
-        """
+    def load_csv(self, path: str) -> None:
+        """Deprecated — use Store.for_csv(path) instead."""
         csv_path = Path(path).resolve()
         fingerprint = _csv_fingerprint(csv_path)
         self._open(csv_path, fingerprint)
@@ -110,7 +117,7 @@ class Store:
         Returns:
             pandas DataFrame with the query results.
         """
-        return self._conn.execute(query).df()
+        return self._ibis.sql(query).execute()
 
     def write_back_column(self, name: str, values: Any) -> None:
         """Add or replace a column in the stored table.
@@ -124,31 +131,29 @@ class Store:
         """
         col_list = list(values)
         n = len(col_list)
+        con = self._ibis.con  # raw duckdb connection for low-level writes
 
         # Build a temp table: (_ti_row INTEGER, <name> <inferred type>)
         # range(n) produces [0, 1, ..., n-1] — same order as the source rows.
-        self._conn.execute(
+        con.execute(
             f"CREATE OR REPLACE TEMP TABLE _wb AS "
             f"SELECT unnest(range({n})) AS _ti_row, unnest(?) AS {name}",
             [col_list],
         )
 
-        existing = {
-            row[0]
-            for row in self._conn.execute(f"DESCRIBE {_INTERNAL}").fetchall()
-        }
-        # Drop the old version of the column when overwriting.
+        existing = {row[0] for row in con.execute(f"DESCRIBE {_INTERNAL}").fetchall()}
         src_cols = f"{_INTERNAL}.* EXCLUDE ({name})" if name in existing else f"{_INTERNAL}.*"
 
-        self._conn.execute(
+        con.execute(
             f"CREATE OR REPLACE TABLE {_INTERNAL} AS "
             f"SELECT {src_cols}, _wb.{name} "
             f"FROM {_INTERNAL} "
             f"JOIN _wb ON {_INTERNAL}._ti_row = _wb._ti_row"
         )
-        # Rebuild the view so it reflects the new column.
-        self._conn.execute(
+        # Rebuild the view and refresh the ibis TableExpr.
+        con.execute(
             f"CREATE OR REPLACE VIEW {_VIEW} AS "
             f"SELECT * EXCLUDE (_ti_row) FROM {_INTERNAL}"
         )
-        self._conn.execute("DROP TABLE IF EXISTS _wb")
+        con.execute("DROP TABLE IF EXISTS _wb")
+        self._table = self._ibis.table(_VIEW)
