@@ -53,7 +53,7 @@ check it here.
 ### Phase 0 — Foundation (build first; everything depends on it)
 - [x] `store` — load a table, run SQL, write columns back (DuckDB)
 - [ ] `results.Result` — the structured return contract
-- [ ] `validation.dtypes` — column type classification (the routing input)
+- [x] `validation.dtypes` — column type classification (the routing input)
 - [ ] `validation.assumptions` — normality / equal-variance / sample-size checks
 - [x] `identity` — operation identity + caching key
 - [x] `Session` — state holder that delegates to the analytics layer
