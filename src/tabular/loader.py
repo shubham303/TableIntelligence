@@ -7,10 +7,10 @@ is the responsibility of validation.dtypes.
 """
 from __future__ import annotations
 
-from typing import Any
+import pandas as pd
 
 
-def load(path: str) -> Any:
+def load(path: str) -> pd.DataFrame:
     """Load a CSV file and return it with inferred dtypes.
 
     Args:
@@ -19,4 +19,4 @@ def load(path: str) -> Any:
     Returns:
         A pandas DataFrame with dtypes inferred from the file content.
     """
-    raise NotImplementedError("planned: see docs/roadmap.md")
+    return pd.read_csv(path)

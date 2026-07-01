@@ -51,12 +51,12 @@ it, implement it against an existing library, add it to the test harness, then
 check it here.
 
 ### Phase 0 — Foundation (build first; everything depends on it)
-- [ ] `store` — load a table, run SQL, write columns back (DuckDB)
+- [x] `store` — load a table, run SQL, write columns back (DuckDB)
 - [ ] `results.Result` — the structured return contract
 - [ ] `validation.dtypes` — column type classification (the routing input)
 - [ ] `validation.assumptions` — normality / equal-variance / sample-size checks
-- [ ] `identity` — operation identity + caching key
-- [ ] `Session` — state holder that delegates to the analytics layer
+- [x] `identity` — operation identity + caching key
+- [x] `Session` — state holder that delegates to the analytics layer
 - [ ] eval harness — fixture CSVs + known-correct answers
 
 ### Phase 1 — Descriptive
