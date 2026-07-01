@@ -1,0 +1,26 @@
+product_id,name,category,price,stock_count,rating,is_available,discount_pct
+P001,Wireless Headphones,Electronics,89.99,145,4.5,True,10
+P002,Running Shoes,Apparel,64.50,230,4.2,True,0
+P003,Coffee Maker,Kitchen,129.00,67,4.7,True,15
+P004,Yoga Mat,Sports,34.99,312,4.1,True,0
+P005,Mechanical Keyboard,Electronics,149.99,89,4.8,True,5
+P006,Denim Jacket,Apparel,79.00,0,3.9,False,0
+P007,Blender,Kitchen,59.50,178,4.3,True,10
+P008,Protein Powder,Health,45.99,502,4.0,True,0
+P009,Laptop Stand,Electronics,39.99,221,4.6,True,0
+P010,Sneakers,Apparel,110.00,95,4.4,True,20
+P011,Air Fryer,Kitchen,99.99,43,4.9,True,0
+P012,Resistance Bands,Sports,19.99,654,4.2,True,0
+P013,Bluetooth Speaker,Electronics,59.99,188,4.3,True,10
+P014,Winter Coat,Apparel,199.00,0,4.5,False,0
+P015,Instant Pot,Kitchen,89.00,134,4.8,True,5
+P016,Vitamins C Supplement,Health,14.99,1200,4.1,True,0
+P017,USB-C Hub,Electronics,49.99,267,4.4,True,0
+P018,Leggings,Apparel,34.99,445,4.3,True,0
+P019,Toaster Oven,Kitchen,74.50,88,4.2,True,15
+P020,Foam Roller,Sports,24.99,380,4.0,True,0
+P021,Noise Cancelling Earbuds,Electronics,199.99,56,4.7,True,10
+P022,Hiking Boots,Apparel,145.00,72,4.6,True,0
+P023,Rice Cooker,Kitchen,45.00,201,4.5,True,0
+P024,Protein Bar Pack,Health,29.99,843,3.8,True,5
+P025,Webcam HD,Electronics,79.99,112,4.3,True,0

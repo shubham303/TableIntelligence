@@ -1,0 +1,26 @@
+sensor_id,location,status,temperature_c,humidity_pct,reading_count,battery_pct,is_online
+S001,Warehouse A,normal,22.4,55.1,14823,87,True
+S002,Warehouse B,normal,23.1,60.3,9201,72,True
+S003,Office 1F,normal,21.0,48.7,22104,95,True
+S004,Office 2F,warning,26.8,71.2,18934,41,True
+S005,Server Room,critical,31.5,35.0,7650,88,True
+S006,Parking Lot,normal,18.2,62.4,11203,60,True
+S007,Roof,warning,28.9,80.1,5402,33,True
+S008,Warehouse A,normal,21.9,54.8,14901,85,True
+S009,Warehouse C,offline,0.0,0.0,6700,2,False
+S010,Office 1F,normal,21.3,49.0,23004,91,True
+S011,Office 3F,normal,20.8,47.5,19500,78,True
+S012,Loading Dock,normal,17.5,65.0,8800,55,True
+S013,Server Room,warning,29.1,36.2,7890,80,True
+S014,Cafeteria,normal,23.5,58.9,13200,67,True
+S015,Gym,normal,24.7,72.3,10450,74,True
+S016,Roof,critical,33.2,82.5,4100,18,True
+S017,Parking Lot,normal,17.8,61.8,11700,58,True
+S018,Warehouse B,offline,0.0,0.0,5300,0,False
+S019,Office 2F,normal,22.0,50.1,20100,90,True
+S020,Cafeteria,normal,23.8,59.4,13500,65,True
+S021,Loading Dock,warning,27.3,68.7,9100,29,True
+S022,Gym,normal,25.1,73.0,10800,72,True
+S023,Office 3F,normal,21.5,48.2,19900,77,True
+S024,Server Room,normal,24.5,34.8,8200,92,True
+S025,Warehouse C,normal,20.3,53.6,12400,83,True

@@ -1,0 +1,31 @@
+customer_id,name,country,tier,age,total_spend,num_orders,avg_order_value,is_churned,has_subscription
+C001,Alice Freeman,USA,Gold,34,4820.50,23,209.59,False,True
+C002,Bruno Silva,Brazil,Silver,27,1240.75,8,155.09,False,False
+C003,Chen Wei,China,Platinum,45,12300.00,61,201.64,False,True
+C004,Diana Müller,Germany,Gold,38,5100.25,29,175.87,False,True
+C005,Ethan Brooks,USA,Bronze,22,380.00,3,126.67,False,False
+C006,Fatima Al-Hassan,UAE,Silver,31,1890.50,11,171.86,True,False
+C007,George Papadopoulos,Greece,Bronze,55,620.00,5,124.00,True,False
+C008,Hana Yamamoto,Japan,Platinum,41,9800.75,50,196.02,False,True
+C009,Ivan Petrov,Russia,Silver,29,1550.00,9,172.22,False,False
+C010,Julia Santos,Brazil,Gold,36,4200.00,21,200.00,False,True
+C011,Kevin O'Brien,Ireland,Bronze,24,290.00,2,145.00,True,False
+C012,Layla Hassan,Egypt,Silver,33,1700.25,10,170.03,False,False
+C013,Marco Rossi,Italy,Gold,48,5600.50,28,200.02,False,True
+C014,Nadia Kowalski,Poland,Bronze,26,410.00,3,136.67,True,False
+C015,Oscar Nguyen,Vietnam,Platinum,52,11200.00,55,203.64,False,True
+C016,Priya Patel,India,Silver,30,1600.00,9,177.78,False,True
+C017,Quentin Dubois,France,Gold,43,4950.75,25,198.03,False,True
+C018,Rosa Hernandez,Mexico,Bronze,28,350.00,3,116.67,True,False
+C019,Sven Eriksson,Sweden,Platinum,39,13500.00,65,207.69,False,True
+C020,Tanya Volkov,Russia,Silver,35,2100.50,12,175.04,False,False
+C021,Umar Farouk,Nigeria,Bronze,21,270.00,2,135.00,True,False
+C022,Valentina Cruz,Argentina,Gold,44,4700.00,24,195.83,False,True
+C023,William Zhang,Canada,Silver,32,1950.25,11,177.30,False,False
+C024,Xenia Stavros,Greece,Bronze,57,500.00,4,125.00,True,False
+C025,Yusuf Ibrahim,Turkey,Gold,37,5250.00,27,194.44,False,True
+C026,Zara Ahmed,Pakistan,Bronze,23,320.00,2,160.00,False,False
+C027,Aaron Mitchell,USA,Platinum,46,10500.50,52,201.93,False,True
+C028,Bella Turner,UK,Silver,29,1800.00,10,180.00,False,True
+C029,Carlos Mendez,Colombia,Bronze,34,440.00,3,146.67,True,False
+C030,Demi Park,South Korea,Gold,40,4400.25,22,200.01,False,True

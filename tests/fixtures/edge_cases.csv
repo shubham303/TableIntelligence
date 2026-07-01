@@ -1,0 +1,16 @@
+id,label,category,score,count,flag,notes
+1,Alpha,A,1.0,1,True,normal row
+2,Beta,B,2.5,10,False,normal row
+3,Gamma,A,3.7,5,True,normal row
+4,,C,4.1,0,False,missing label
+5,Epsilon,B,,8,True,missing score
+6,Zeta,A,6.0,3,,missing flag
+7,Eta,,7.2,12,True,missing category
+8,Theta,C,0.0,0,False,zero values
+9,Iota,A,999.99,9999,True,large values
+10,Kappa,B,-1.5,7,False,negative score
+11,Lambda,C,3.14159,42,True,pi-ish score
+12,Mu,A,0.001,1,False,very small score
+13,Nu,B,100.0,100,True,round numbers
+14,Xi,C,50.5,50,False,half values
+15,Omicron,A,3.7,5,True,duplicate of row 3
