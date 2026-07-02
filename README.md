@@ -1,4 +1,4 @@
-# tabular  *(placeholder name — rename before public release)*
+# TableIntelligence *
 
 A deterministic, reproducible intelligence layer for **single-table** data.
 
