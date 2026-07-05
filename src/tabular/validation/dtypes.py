@@ -29,6 +29,11 @@ _IDENTIFIER_DISTINCT_RATIO = 0.9
 # categorical rather than continuous.
 _NUMERIC_CATEGORICAL_MAX_DISTINCT = 15
 
+# A real-valued (float/decimal) column whose distinct-value ratio exceeds this is
+# treated as continuous even below the absolute cutoff — otherwise a genuinely
+# continuous float on a small table gets mislabeled categorical.
+_CONTINUOUS_DISTINCT_RATIO = 0.5
+
 
 def classify_column(col_name: str, store: object) -> str:
     """Classify a single column into a canonical type.
@@ -60,7 +65,15 @@ def classify_column(col_name: str, store: object) -> str:
     # Numeric types.
     if isinstance(dtype, (dt.Integer, dt.Floating, dt.Decimal)):
         n_distinct = col.nunique().execute()
-        return "continuous" if n_distinct > _NUMERIC_CATEGORICAL_MAX_DISTINCT else "categorical_nominal"
+        if n_distinct > _NUMERIC_CATEGORICAL_MAX_DISTINCT:
+            return "continuous"
+        # A real-valued column with mostly-distinct values is continuous even on a
+        # small table, where the absolute cutoff alone would mislabel it.
+        if isinstance(dtype, (dt.Floating, dt.Decimal)):
+            n_rows = table.count().execute()
+            if n_rows > 0 and (n_distinct / n_rows) > _CONTINUOUS_DISTINCT_RATIO:
+                return "continuous"
+        return "categorical_nominal"
 
     # String types.
     if isinstance(dtype, dt.String):

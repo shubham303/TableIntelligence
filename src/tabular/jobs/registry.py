@@ -51,7 +51,9 @@ class JobRegistry:
         Returns:
             A new Job with status "running".
         """
-        raise NotImplementedError("planned: see docs/roadmap.md")
+        job = Job(id=job_id, status="running")
+        self._jobs[job_id] = job
+        return job
 
     def get(self, job_id: str) -> Job:
         """Retrieve a job by id.
@@ -62,7 +64,7 @@ class JobRegistry:
         Returns:
             The Job, or raises KeyError if not found.
         """
-        raise NotImplementedError("planned: see docs/roadmap.md")
+        return self._jobs[job_id]
 
     def complete(self, job_id: str, result: Any) -> None:
         """Mark a job as done with its result.
@@ -71,7 +73,9 @@ class JobRegistry:
             job_id: The job's unique identifier.
             result: The Result object produced by the job.
         """
-        raise NotImplementedError("planned: see docs/roadmap.md")
+        job = self._jobs[job_id]
+        job.result = result
+        job.status = "done"
 
     def fail(self, job_id: str, error: str) -> None:
         """Mark a job as failed with an error message.
@@ -80,4 +84,6 @@ class JobRegistry:
             job_id: The job's unique identifier.
             error: Description of what went wrong.
         """
-        raise NotImplementedError("planned: see docs/roadmap.md")
+        job = self._jobs[job_id]
+        job.error = error
+        job.status = "failed"

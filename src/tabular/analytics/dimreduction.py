@@ -1,32 +1,32 @@
 """Dimensionality reduction family.
 
-Planned functions: reduce_dimensions.
-Libraries (planned, not yet imported): scikit-learn (PCA, t-SNE), umap-learn (UMAP).
+reduce_dimensions projects the feature matrix to a few components and writes them
+back as columns (so clustering on the reduced space becomes an ordinary query).
+PCA and t-SNE are scikit-learn native; UMAP is an optional lazy import.
 """
 from __future__ import annotations
 
 from typing import Any
 
-# planned: from sklearn.decomposition import PCA
-# planned: from sklearn.manifold import TSNE
-# planned: import umap
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+
+from ..identity import _lazy_import
+from ..results import Result
+from . import _prep
+
+_RANDOM_STATE = 0
 
 
 def reduce_dimensions(
     store: Any,
     method: str = "pca",
     n_components: int = 2,
-) -> Any:
+) -> Result:
     """Reduce table dimensionality and write the components back as columns.
 
-    Supports:
-        "pca"  — linear, interpretable, fast. Components are written back as
-                 pca_0, pca_1, ... columns.
-        "tsne" — non-linear, good for cluster visualization. Slower; 2D only.
-        "umap" — non-linear, preserves global structure better than t-SNE.
-
-    Reduced coordinates are written back to the store as new columns so follow-up
-    clustering on the reduced space becomes an ordinary query.
+    Components are written back as ``<method>_0 .. <method>_{n-1}`` so downstream
+    analysis on the reduced space is just another query.
 
     Args:
         store: The Store instance holding the table.
@@ -34,7 +34,51 @@ def reduce_dimensions(
         n_components: Number of output dimensions (typically 2 for visualization).
 
     Returns:
-        Result with the explained variance (PCA) or layout coordinates, and
-        the column names written back.
+        Result with explained variance (PCA) and the column names written back.
     """
-    raise NotImplementedError("planned: see docs/roadmap.md")
+    method = method.lower()
+    # Exclude columns we previously wrote back so reduction runs on real features.
+    exclude = tuple(
+        c for c in store._table.schema()
+        if c == "cluster" or c.startswith(("pca_", "tsne_", "umap_"))
+    )
+    X, frame, features = _prep.numeric_matrix(store, exclude=exclude, scale=True)
+
+    if method == "pca":
+        reducer = PCA(n_components=n_components, random_state=_RANDOM_STATE)
+        coords = reducer.fit_transform(X)
+        explained = [float(v) for v in reducer.explained_variance_ratio_]
+    elif method == "tsne":
+        perplexity = min(30.0, max(5.0, (X.shape[0] - 1) / 3.0))
+        reducer = TSNE(
+            n_components=n_components, random_state=_RANDOM_STATE, perplexity=perplexity
+        )
+        coords = reducer.fit_transform(X)
+        explained = None
+    elif method == "umap":
+        umap = _lazy_import("umap")  # optional dependency
+        reducer = umap.UMAP(n_components=n_components, random_state=_RANDOM_STATE)
+        coords = reducer.fit_transform(X)
+        explained = None
+    else:
+        raise ValueError(f"Unknown method {method!r}; expected pca, tsne, or umap.")
+
+    written = []
+    for i in range(n_components):
+        col = f"{method}_{i}"
+        store.write_back_column(col, [float(v) for v in coords[:, i]])
+        written.append(col)
+
+    return Result(
+        method=method,
+        summary=(
+            f"Reduced {len(features)} features to {n_components}D via {method.upper()}"
+            + (f" ({sum(explained):.0%} variance)" if explained else "")
+        ),
+        values={
+            "n_components": n_components,
+            "explained_variance_ratio": explained,
+            "columns": written,
+        },
+        metadata={"method": method, "features": features, "columns_written": written},
+    )

@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from . import _ducktable
 from .identity import fingerprint_dataframe, _lazy_import
 from .loader import load
 
@@ -89,16 +90,7 @@ class Store:
         self._ibis = ibis.duckdb.connect(str(db_path))
 
         if _INTERNAL not in self._ibis.list_tables():
-            # _ti_row is a stable 0-based row id used by write_back_column.
-            self._ibis.raw_sql(
-                f"CREATE TABLE {_INTERNAL} AS "
-                f"SELECT row_number() OVER () - 1 AS _ti_row, * "
-                f"FROM read_csv_auto('{csv_path}')"
-            )
-            self._ibis.raw_sql(
-                f"CREATE VIEW {_VIEW} AS "
-                f"SELECT * EXCLUDE (_ti_row) FROM {_INTERNAL}"
-            )
+            _ducktable.load_csv(self._ibis, csv_path, _INTERNAL, _VIEW)
 
         self._table = self._ibis.table(_VIEW)
 
@@ -119,6 +111,18 @@ class Store:
         """
         return self._ibis.sql(query).execute()
 
+    def get_frame(self) -> Any:
+        """Return the full table as a pandas DataFrame in stable row order.
+
+        Rows come back ordered by the internal ``_ti_row`` id (0-based), so the
+        i-th row of the frame corresponds to ``_ti_row = i``. This is the order
+        write_back_column's positional join expects — any per-row array computed
+        from this frame can be written straight back without realignment.
+
+        The ``_ti_row`` column itself is excluded from the result.
+        """
+        return _ducktable.frame_in_order(self._ibis, _INTERNAL)
+
     def write_back_column(self, name: str, values: Any) -> None:
         """Add or replace a column in the stored table.
 
@@ -129,31 +133,5 @@ class Store:
             name: Column name to create or overwrite.
             values: Array-like of values, length must match the table row count.
         """
-        col_list = list(values)
-        n = len(col_list)
-        con = self._ibis.con  # raw duckdb connection for low-level writes
-
-        # Build a temp table: (_ti_row INTEGER, <name> <inferred type>)
-        # range(n) produces [0, 1, ..., n-1] — same order as the source rows.
-        con.execute(
-            f"CREATE OR REPLACE TEMP TABLE _wb AS "
-            f"SELECT unnest(range({n})) AS _ti_row, unnest(?) AS {name}",
-            [col_list],
-        )
-
-        existing = {row[0] for row in con.execute(f"DESCRIBE {_INTERNAL}").fetchall()}
-        src_cols = f"{_INTERNAL}.* EXCLUDE ({name})" if name in existing else f"{_INTERNAL}.*"
-
-        con.execute(
-            f"CREATE OR REPLACE TABLE {_INTERNAL} AS "
-            f"SELECT {src_cols}, _wb.{name} "
-            f"FROM {_INTERNAL} "
-            f"JOIN _wb ON {_INTERNAL}._ti_row = _wb._ti_row"
-        )
-        # Rebuild the view and refresh the ibis TableExpr.
-        con.execute(
-            f"CREATE OR REPLACE VIEW {_VIEW} AS "
-            f"SELECT * EXCLUDE (_ti_row) FROM {_INTERNAL}"
-        )
-        con.execute("DROP TABLE IF EXISTS _wb")
+        _ducktable.write_back(self._ibis, _INTERNAL, _VIEW, name, values)
         self._table = self._ibis.table(_VIEW)

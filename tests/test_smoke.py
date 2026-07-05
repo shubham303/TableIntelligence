@@ -36,24 +36,27 @@ def test_result_repr():
     assert "strong positive correlation" in repr(r)
 
 
-def test_session_load_raises():
-    """Session.load raises NotImplementedError — skeleton is wired correctly."""
-    with pytest.raises(NotImplementedError):
-        Session.load("customers.csv")
+def test_session_load_returns_session():
+    """Session.load returns a wired Session backed by a store."""
+    s = Session.load("tests/fixtures/customers.csv")
+    assert isinstance(s, Session)
+    assert s._store is not None
 
 
-def test_session_profile_raises():
-    """Session().profile raises NotImplementedError."""
-    s = Session()
-    with pytest.raises(NotImplementedError):
-        s.profile()
+def test_session_profile_runs():
+    """Session().profile returns a Result over the loaded table."""
+    s = Session.load("tests/fixtures/customers.csv")
+    result = s.profile()
+    assert isinstance(result, Result)
+    assert "age" in result.values
 
 
-def test_session_analyze_association_raises():
-    """Session().analyze_association raises NotImplementedError."""
-    s = Session()
-    with pytest.raises(NotImplementedError):
-        s.analyze_association("col_a", "col_b")
+def test_session_analyze_association_runs():
+    """Session().analyze_association returns a Result with a chosen method."""
+    s = Session.load("tests/fixtures/customers.csv")
+    result = s.analyze_association("age", "total_spend")
+    assert isinstance(result, Result)
+    assert result.method in {"pearson", "spearman"}
 
 
 def test_version():

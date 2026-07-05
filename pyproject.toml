@@ -12,10 +12,25 @@ dependencies = [
     "pandas",
     "numpy",
     "pydantic>=2",
+    "scipy",
+    "scikit-learn",
+    "statsmodels",
+    "shap",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest"]
+# MCP server surface (for Claude Cowork / Desktop and other MCP clients).
+mcp = ["mcp"]
+# Heavier / system-dependent backends, imported lazily where used.
+# xgboost + lightgbm: alternative gradient boosters (need libomp on macOS).
+# umap-learn: non-linear dimensionality reduction (method="umap").
+# prophet: alternative forecaster.
+extras = ["xgboost", "lightgbm", "umap-learn", "prophet"]
+
+[project.scripts]
+tabular = "tabular.cli:main"
+tabular-mcp = "tabular.mcp_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
