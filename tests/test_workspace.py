@@ -113,7 +113,7 @@ def test_analytics_run_on_joined_table(linked):
     joined = linked.join(["orders", "customers", "products"], name="enriched")
     # a single-table operation on a joined table
     r = joined.analyze_association("order_total", "tier")
-    assert r.method in {"t_test", "anova", "mann_whitney", "kruskal_wallis"}
+    assert r.method in {"welch_t_test", "anova", "mann_whitney", "kruskal_wallis"}
 
 
 def test_join_without_fk_path_raises(tmp_path):
@@ -129,7 +129,95 @@ def test_join_without_fk_path_raises(tmp_path):
 def test_create_table_from_sql(linked):
     t = linked.create_table(
         "big_orders",
-        "SELECT * FROM orders WHERE order_total > 500",
+        select_sql="SELECT * FROM orders WHERE order_total > 500",
     )
     assert "big_orders" in linked.tables
     assert len(t.get_frame()) <= len(linked.table("orders").get_frame())
+
+
+def test_create_table_from_schema_then_insert(linked):
+    t = linked.create_table(
+        "clean_orders",
+        columns=[("order_id", "VARCHAR"), ("total", "DECIMAL(10,2)")],
+    )
+    assert list(t.get_frame().columns) == ["order_id", "total"]
+    assert len(t.get_frame()) == 0
+
+    inserted = linked.insert_into(
+        "clean_orders", "SELECT order_id, CAST(order_total AS DECIMAL(10,2)) FROM orders"
+    )
+    assert inserted == len(linked.table("orders").get_frame())
+    assert len(linked.table("clean_orders").get_frame()) == inserted
+
+    # A second insert appends and _ti_row keeps ordering stable for analytics.
+    linked.insert_into("clean_orders", "VALUES ('X9999', 1.00)")
+    assert len(linked.table("clean_orders").get_frame()) == inserted + 1
+
+
+def test_create_table_rejects_bad_type(linked):
+    import pytest
+
+    with pytest.raises(ValueError):
+        linked.create_table("evil", columns=[("x", "VARCHAR); DROP TABLE orders;--")])
+
+
+def test_create_table_requires_exactly_one_mode(linked):
+    import pytest
+
+    with pytest.raises(ValueError):
+        linked.create_table("neither")
+    with pytest.raises(ValueError):
+        linked.create_table("both", columns=[("x", "INT")], select_sql="SELECT 1")
+
+
+# --------------------------------------------------------------------------- #
+# derived-column registry: written-back annotations must not leak into features
+# --------------------------------------------------------------------------- #
+
+def test_derived_columns_excluded_from_features(linked):
+    from tabular.analytics import _prep
+
+    orders = linked.table("orders")
+    before_num, before_cat = _prep.feature_columns(orders)
+
+    # A written-back annotation column must be recorded as derived...
+    orders.write_back_column("flagged", [True] * len(orders.get_frame()))
+    assert "flagged" in orders.derived_columns()
+
+    # ...and therefore never appear as a feature.
+    after_num, after_cat = _prep.feature_columns(orders)
+    assert "flagged" not in after_num + after_cat
+    assert (after_num, after_cat) == (before_num, before_cat)
+
+
+def test_write_back_feature_true_stays_a_feature(linked):
+    from tabular.analytics import _prep
+
+    orders = linked.table("orders")
+    n = len(orders.get_frame())
+    orders.write_back_column("component_0", [i * 0.1 for i in range(n)], feature=True)
+    assert "component_0" not in orders.derived_columns()
+    num, cat = _prep.feature_columns(orders)
+    assert "component_0" in num
+
+
+def test_derived_registry_survives_reopen(tmp_path):
+    from tabular.analytics import _prep
+    from tabular.workspace import Workspace
+
+    db = str(tmp_path / "ws.duckdb")
+    src = tmp_path / "orders.csv"
+    shutil.copy("tests/fixtures/orders.csv", src)
+
+    ws = Workspace.create([str(src)], db_path=db)
+    t = ws.table("orders")
+    t.write_back_column("anomaly", [False] * len(t.get_frame()))
+    assert "anomaly" in t.derived_columns()
+    ws.close()
+
+    reopened = Workspace(db_path=db)
+    rt = reopened.table("orders")
+    assert "anomaly" in rt.derived_columns()
+    num, cat = _prep.feature_columns(rt)
+    assert "anomaly" not in num + cat
+    reopened.close()

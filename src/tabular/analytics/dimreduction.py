@@ -66,7 +66,9 @@ def reduce_dimensions(
     written = []
     for i in range(n_components):
         col = f"{method}_{i}"
-        store.write_back_column(col, [float(v) for v in coords[:, i]])
+        # Components are usable features (e.g. reduce_dimensions → cluster), so
+        # they stay eligible in feature matrices rather than being marked derived.
+        store.write_back_column(col, [float(v) for v in coords[:, i]], feature=True)
         written.append(col)
 
     return Result(

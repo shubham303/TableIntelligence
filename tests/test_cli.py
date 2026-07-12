@@ -55,7 +55,7 @@ def test_associate_picks_test(tmp_path, capsys):
     _, load = _run(capsys, ["--base", base, "load", *_fixtures(tmp_path, "employees.csv")])
     key = load["session_key"]
     _, r = _run(capsys, ["--base", base, "associate", "department", "salary", "--session", key, "--table", "employees"])
-    assert r["method"] in {"t_test", "anova", "mann_whitney", "kruskal_wallis"}
+    assert r["method"] in {"welch_t_test", "anova", "mann_whitney", "kruskal_wallis"}
 
 
 def test_error_is_json(tmp_path, capsys):

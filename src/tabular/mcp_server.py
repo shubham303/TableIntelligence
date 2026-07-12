@@ -16,7 +16,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from . import persistence
+from . import persistence, scratchpad
 from ._serialize import jsonable as _jsonable, result_dict as _result
 from .session import Session
 
@@ -91,6 +91,42 @@ def add_table(session_key: str, path: str) -> dict:
 
 
 # --------------------------------------------------------------------------- #
+# scratchpad: your own plain-text notebook for this session
+# --------------------------------------------------------------------------- #
+
+@mcp.tool()
+def scratchpad_add(session_key: str, text: str) -> dict:
+    """Append a note to this session's scratchpad — your own working memory.
+
+    Write free-form English whenever you want to remember something across steps:
+    a finding, a thing you tried and its outcome, a hypothesis, a reminder. Each
+    note is stamped with the current date-time automatically. This is separate from
+    the data — use it so you can pick up where you left off without recomputing.
+    """
+    _get(session_key)  # require a live session; raises if the key is unknown
+    stamp = scratchpad.add(session_key, text)
+    return {"session_key": session_key, "written_at": stamp}
+
+
+@mcp.tool()
+def scratchpad_read(session_key: str) -> dict:
+    """Read back everything you've written to this session's scratchpad, in order."""
+    _get(session_key)  # require a live session; raises if the key is unknown
+    return {"session_key": session_key, "text": scratchpad.read(session_key)}
+
+
+@mcp.tool()
+def scratchpad_search(session_key: str, query: str) -> dict:
+    """Search your scratchpad notes for `query` (simple case-insensitive text match).
+
+    Returns the timestamped notes that mention the query — e.g. search "salary" to
+    recall everything you noted about salary.
+    """
+    _get(session_key)  # require a live session; raises if the key is unknown
+    return {"session_key": session_key, "matches": scratchpad.search(session_key, query)}
+
+
+# --------------------------------------------------------------------------- #
 # structure: relationships, join, sql
 # --------------------------------------------------------------------------- #
 
@@ -110,16 +146,94 @@ def join(session_key: str, tables: list[str], name: str | None = None, how: str 
 
 @mcp.tool()
 def run_sql(session_key: str, query: str, limit: int = 1000) -> dict:
-    """Run SQL across the session's tables (each visible by name). Rows are capped at `limit`."""
+    """Run a read-only SQL SELECT across the session's tables (each visible by name).
+    Rows are capped at `limit`. To build or fill tables, use create_table / insert_into."""
     frame = _get(session_key).run_sql(query)
     total = int(len(frame))
     records = _jsonable(frame.head(limit).to_dict(orient="records"))
     return {"n_rows": total, "truncated": total > limit, "rows": records}
 
 
+@mcp.tool()
+def create_table(
+    session_key: str,
+    name: str,
+    columns: list[dict] | None = None,
+    select_sql: str | None = None,
+) -> dict:
+    """Create a new clean, structured table in the session.
+
+    Use this when the source data is messy or badly shaped: define the correct
+    schema here, then copy the data across with insert_into (one query at a time
+    or in bulk). run_sql cannot create tables — this is the tool that does.
+
+    Two mutually exclusive modes (pass exactly one):
+    - columns: an empty typed table. Each entry is {"name": "...", "type": "..."},
+      e.g. [{"name": "order_id", "type": "BIGINT"}, {"name": "amount", "type": "DECIMAL(10,2)"}].
+      Allowed types are the standard SQL/DuckDB types (INTEGER, BIGINT, DOUBLE,
+      DECIMAL(p,s), VARCHAR, DATE, TIMESTAMP, BOOLEAN, ...).
+    - select_sql: materialize a query over the existing tables as a new table in
+      one shot (e.g. "SELECT trim(name) AS name, CAST(qty AS INTEGER) AS qty FROM raw").
+
+    Returns the created table's name and columns.
+    """
+    cols = None
+    if columns is not None:
+        cols = [(c["name"], c["type"]) for c in columns]
+    table = _get(session_key).create_table(name, columns=cols, select_sql=select_sql)
+    frame = table.get_frame()
+    return {"table": table.name, "columns": list(frame.columns), "n_rows": int(len(frame))}
+
+
+@mcp.tool()
+def insert_into(session_key: str, name: str, source_sql: str) -> dict:
+    """Copy rows into an existing table (partner of create_table's `columns` mode).
+
+    `source_sql` is a SELECT or VALUES query whose columns map positionally to the
+    target table's columns, e.g.
+      "SELECT trim(customer) AS name, CAST(spend AS DECIMAL(10,2)) FROM raw WHERE spend IS NOT NULL"
+    or "VALUES ('Acme', 12.50), ('Globex', 9.99)".
+    Call repeatedly to build a table up from many messy sources. Returns the
+    number of rows inserted and the table's new total row count.
+    """
+    session = _get(session_key)
+    inserted = session.insert_into(name, source_sql)
+    total = int(len(session.table(name).get_frame()))
+    return {"table": name, "inserted": inserted, "n_rows": total}
+
+
 # --------------------------------------------------------------------------- #
 # descriptive
 # --------------------------------------------------------------------------- #
+
+@mcp.tool()
+def count_rows(session_key: str, table: str) -> dict:
+    """Number of rows in a table — a cheap in-database COUNT(*), no data materialized.
+
+    Use this instead of `profile` when you only need the row count (e.g. to size a
+    table before an operation); it stays fast on arbitrarily large tables.
+    """
+    return {"table": table, "n_rows": _get(session_key).table(table).count_rows()}
+
+
+@mcp.tool()
+def count_non_null(session_key: str, table: str, column: str) -> dict:
+    """Number of non-NULL (non-NaN) values in a column — an in-database COUNT(col).
+
+    Returns the non-null count plus the row total and derived null count, all from
+    a cheap COUNT with no data materialized. Fast on arbitrarily large tables.
+    """
+    t = _get(session_key).table(table)
+    n_rows = t.count_rows()
+    n_non_null = t.count_non_null(column)
+    return {
+        "table": table,
+        "column": column,
+        "n_non_null": n_non_null,
+        "n_rows": n_rows,
+        "n_null": n_rows - n_non_null,
+    }
+
 
 @mcp.tool()
 def profile(session_key: str, table: str) -> dict:
@@ -143,6 +257,134 @@ def analyze_association(session_key: str, table: str, col_a: str, col_b: str) ->
 def association_matrix(session_key: str, table: str) -> dict:
     """Pairwise association strength across all column pairs of a table."""
     return _result(_get(session_key).table(table).association_matrix())
+
+
+# --------------------------------------------------------------------------- #
+# feature computation: build new model-eligible columns from existing ones
+# --------------------------------------------------------------------------- #
+
+@mcp.tool()
+def combine_columns(
+    session_key: str, table: str, col_a: str, col_b: str, op: str, name: str | None = None
+) -> dict:
+    """Create a feature by combining two numeric columns with an arithmetic op.
+
+    `op` is one of: add, subtract, multiply, divide, ratio. Division-by-zero
+    becomes NaN. This is the primitive for most domain features — e.g.
+    density = mass / volume: you supply the columns and the op, the arithmetic is
+    generic. The new column is written back and is eligible for modelling.
+    """
+    return _result(_get(session_key).table(table).combine_columns(col_a, col_b, op, name))
+
+
+@mcp.tool()
+def transform_column(
+    session_key: str, table: str, column: str, func: str, name: str | None = None
+) -> dict:
+    """Create a feature by applying a math transform to one numeric column.
+
+    `func` is one of: log, log1p, sqrt, square, reciprocal, abs, zscore. Values
+    outside a transform's domain (e.g. log of a non-positive) become NaN. Use log
+    to tame skew, zscore to standardise, etc.
+    """
+    return _result(_get(session_key).table(table).transform_column(column, func, name))
+
+
+@mcp.tool()
+def bin_column(
+    session_key: str,
+    table: str,
+    column: str,
+    n_bins: int = 4,
+    strategy: str = "quantile",
+    name: str | None = None,
+) -> dict:
+    """Discretise a numeric column into ordinal bins (a categorical feature).
+
+    `strategy` = "quantile" (equal-frequency) or "uniform" (equal-width). The new
+    column holds 0-based integer bin indices.
+    """
+    return _result(_get(session_key).table(table).bin_column(column, n_bins, strategy, name))
+
+
+@mcp.tool()
+def expand_datetime(
+    session_key: str, table: str, column: str, parts: list[str] | None = None
+) -> dict:
+    """Expand a datetime column into calendar-component features.
+
+    `parts` (default: year, month, dayofweek, is_weekend) is any subset of: year,
+    quarter, month, week, day, dayofweek, dayofyear, hour, is_weekend,
+    is_month_start, is_month_end. Each becomes `<column>_<part>`.
+    """
+    return _result(_get(session_key).table(table).expand_datetime(column, parts))
+
+
+@mcp.tool()
+def group_aggregate(
+    session_key: str,
+    table: str,
+    group_by: str,
+    value: str,
+    agg: str = "mean",
+    name: str | None = None,
+    add_deviation: bool = False,
+) -> dict:
+    """Aggregate `value` within each `group_by` category, broadcast back to rows.
+
+    Every row receives its group's statistic (e.g. each order gets its customer's
+    mean spend) — a strong relational feature. `agg` is one of mean, sum, min,
+    max, std, median, count. With `add_deviation=True`, also writes
+    `<value>_dev_from_<group_by>` = value − group mean.
+    """
+    return _result(
+        _get(session_key).table(table).group_aggregate(group_by, value, agg, name, add_deviation)
+    )
+
+
+@mcp.tool()
+def row_aggregate(
+    session_key: str, table: str, columns: list[str], agg: str = "sum", name: str | None = None
+) -> dict:
+    """Aggregate several numeric columns across each row into one feature.
+
+    `agg` is one of mean, sum, min, max, std, median, count (count = number of
+    non-null inputs). The generic form of a total like "total atom count" from
+    per-element count columns.
+    """
+    return _result(_get(session_key).table(table).row_aggregate(columns, agg, name))
+
+
+@mcp.tool()
+def normalize_fractions(
+    session_key: str, table: str, columns: list[str], suffix: str = "_frac"
+) -> dict:
+    """Turn a set of count/amount columns into per-row fractions of their total.
+
+    Each `<col>` becomes `<col><suffix>` = col / (row sum across the set), so the
+    new columns sum to 1 per row. The generic form of composition fractions.
+    """
+    return _result(_get(session_key).table(table).normalize_fractions(columns, suffix))
+
+
+@mcp.tool()
+def compute_feature(session_key: str, table: str, name: str, expression: str) -> dict:
+    """Create one feature column from a custom SQL scalar expression — the escape
+    hatch when the fixed feature tools can't express what you need.
+
+    `expression` is a DuckDB scalar expression over the table's columns, evaluated
+    per row INSIDE the database (nothing is streamed to the app, so it scales to
+    massive tables), and stored as a new model-eligible column `name`. Examples:
+      - "mass / NULLIF(volume, 0)"
+      - "CASE WHEN age >= 18 THEN 'adult' ELSE 'minor' END"
+      - "avg(spend) OVER (PARTITION BY customer_id)"
+      - "regexp_extract(email, '@(.*)$', 1)"
+
+    Strictly feature generation: it must be a single scalar expression. Statement
+    chaining, subqueries, DDL/DML, and file/catalog functions (read_csv, attach,
+    install, ...) are rejected, and the expression must reference existing columns.
+    """
+    return _result(_get(session_key).table(table).compute_feature(name, expression))
 
 
 # --------------------------------------------------------------------------- #
@@ -172,28 +414,43 @@ def reduce_dimensions(session_key: str, table: str, method: str = "pca", n_compo
 # --------------------------------------------------------------------------- #
 
 @mcp.tool()
-def train_classifier(session_key: str, table: str, target: str, name: str | None = None) -> dict:
-    """Train a classifier on a table and persist it under `name` (default: target)."""
-    return _train(session_key, table, target, name, "classification")
+def train_classifier(
+    session_key: str, table: str, target: str, name: str | None = None, backend: str = "gbt"
+) -> dict:
+    """Train a classifier on a table and persist it under `name` (default: target).
+
+    backend: "gbt" (default gradient-boosted trees) or "tabicl" (TabICL v2
+    foundation model — no per-task training, strong on small/medium tables,
+    needs the optional `tabicl` dependency).
+    """
+    return _train(session_key, table, target, name, "classification", backend)
 
 
 @mcp.tool()
-def train_regressor(session_key: str, table: str, target: str, name: str | None = None) -> dict:
-    """Train a regressor on a table and persist it under `name` (default: target)."""
-    return _train(session_key, table, target, name, "regression")
+def train_regressor(
+    session_key: str, table: str, target: str, name: str | None = None, backend: str = "gbt"
+) -> dict:
+    """Train a regressor on a table and persist it under `name` (default: target).
+
+    backend: "gbt" (default gradient-boosted trees) or "tabicl" (TabICL v2
+    foundation model — needs the optional `tabicl` dependency).
+    """
+    return _train(session_key, table, target, name, "regression", backend)
 
 
-def _train(session_key: str, table: str, target: str, name: str | None, task: str) -> dict:
+def _train(
+    session_key: str, table: str, target: str, name: str | None, task: str, backend: str = "gbt"
+) -> dict:
     session = _get(session_key)
     handle = session.table(table)
     model_name = name or target
     if task == "classification":
-        model = handle.train_classifier(target, name=model_name)
+        model = handle.train_classifier(target, name=model_name, backend=backend)
     else:
-        model = handle.train_regressor(target, name=model_name)
+        model = handle.train_regressor(target, name=model_name, backend=backend)
     persistence.save_model(session, table, model_name, model)
     return {"model_name": model_name, "table": table, "target": target, "task": task,
-            "features": model._feature_names}
+            "backend": backend, "features": model._feature_names}
 
 
 @mcp.tool()
@@ -236,6 +493,77 @@ def decompose(session_key: str, table: str, time_column: str, value_column: str)
 def forecast(session_key: str, table: str, time_column: str, value_column: str, horizon: int = 10) -> dict:
     """Forecast a time series forward `horizon` steps (ARIMA)."""
     return _result(_get(session_key).table(table).forecast(time_column, value_column, horizon))
+
+
+@mcp.tool()
+def detect_changepoints(
+    session_key: str, table: str, time_column: str, value_column: str, penalty: float = 10.0
+) -> dict:
+    """Detect points where a time series shifts behaviour (ruptures PELT).
+
+    Needs the optional `insights` extra. Higher `penalty` = fewer changepoints.
+    """
+    return _result(_get(session_key).table(table).detect_changepoints(time_column, value_column, penalty))
+
+
+# --------------------------------------------------------------------------- #
+# insight primitives
+# --------------------------------------------------------------------------- #
+
+@mcp.tool()
+def explain_metric(session_key: str, table: str, target: str, max_depth: int = 3) -> dict:
+    """Explain a metric: ranked drivers + interpretable segment rules (shallow tree)."""
+    return _result(_get(session_key).table(table).explain_metric(target, max_depth))
+
+
+@mcp.tool()
+def market_basket(
+    session_key: str,
+    table: str,
+    transaction_column: str,
+    item_column: str,
+    min_support: float = 0.01,
+    min_confidence: float = 0.2,
+    max_rules: int = 50,
+) -> dict:
+    """Association-rule mining ("buy X → also buy Y"). Needs the optional `insights` extra."""
+    return _result(_get(session_key).table(table).market_basket(
+        transaction_column, item_column, min_support, min_confidence, max_rules))
+
+
+@mcp.tool()
+def causal_effect(
+    session_key: str,
+    table: str,
+    treatment: str,
+    outcome: str,
+    confounders: list[str] | None = None,
+) -> dict:
+    """Estimate the causal effect of `treatment` on `outcome` (DoWhy backdoor).
+
+    Needs the optional `insights` extra. Defaults confounders to all other features.
+    """
+    return _result(_get(session_key).table(table).causal_effect(treatment, outcome, confounders))
+
+
+@mcp.tool()
+def rfm(session_key: str, table: str, customer_column: str, date_column: str, monetary_column: str) -> dict:
+    """RFM quintile segmentation of customers (Champions, At Risk, ...)."""
+    return _result(_get(session_key).table(table).rfm(customer_column, date_column, monetary_column))
+
+
+@mcp.tool()
+def retention_cohorts(session_key: str, table: str, customer_column: str, date_column: str) -> dict:
+    """Monthly retention matrix: first-purchase cohort × months-since."""
+    return _result(_get(session_key).table(table).retention_cohorts(customer_column, date_column))
+
+
+@mcp.tool()
+def compare_periods(
+    session_key: str, table: str, time_column: str, value_column: str, split: str | None = None
+) -> dict:
+    """Compare a metric before vs after a cut date (means, % change, significance)."""
+    return _result(_get(session_key).table(table).compare_periods(time_column, value_column, split))
 
 
 def main() -> None:

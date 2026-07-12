@@ -123,7 +123,15 @@ class Store:
         """
         return _ducktable.frame_in_order(self._ibis, _INTERNAL)
 
-    def write_back_column(self, name: str, values: Any) -> None:
+    def count_rows(self) -> int:
+        """Row count via an in-database COUNT(*) — cheap, no rows materialized."""
+        return _ducktable.count_rows(self._ibis, _VIEW)
+
+    def count_non_null(self, column: str) -> int:
+        """Count of non-NULL values in a column, computed inside DuckDB."""
+        return _ducktable.count_non_null(self._ibis, _VIEW, column)
+
+    def write_back_column(self, name: str, values: Any, feature: bool = False) -> None:
         """Add or replace a column in the stored table.
 
         Uses an explicit row-id join inside DuckDB — no pandas round-trip.
@@ -132,6 +140,32 @@ class Store:
         Args:
             name: Column name to create or overwrite.
             values: Array-like of values, length must match the table row count.
+            feature: If False (default) the column is recorded as a derived
+                annotation and excluded from feature matrices; pass True for
+                derived columns meant to be features (e.g. reduced dimensions).
         """
         _ducktable.write_back(self._ibis, _INTERNAL, _VIEW, name, values)
         self._table = self._ibis.table(_VIEW)
+        if feature:
+            _ducktable.unregister_derived(self._ibis, _VIEW, name)
+        else:
+            _ducktable.register_derived(self._ibis, _VIEW, name)
+
+    def add_computed_column(self, name: str, expression: str, feature: bool = True) -> int:
+        """Materialize a SQL scalar expression as a new column, in-database.
+
+        Runs entirely inside DuckDB over the stored table (no app-side
+        materialization). The expression is validated to be a single scalar over
+        the table's columns. Returns the count of non-null values.
+        """
+        n = _ducktable.add_computed_column(self._ibis, _INTERNAL, _VIEW, name, expression)
+        self._table = self._ibis.table(_VIEW)
+        if feature:
+            _ducktable.unregister_derived(self._ibis, _VIEW, name)
+        else:
+            _ducktable.register_derived(self._ibis, _VIEW, name)
+        return n
+
+    def derived_columns(self) -> set[str]:
+        """Names of derived (non-feature) columns; see write_back_column."""
+        return _ducktable.derived_columns(self._ibis, _VIEW)

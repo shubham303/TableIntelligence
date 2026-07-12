@@ -27,6 +27,16 @@ mcp = ["mcp"]
 # umap-learn: non-linear dimensionality reduction (method="umap").
 # prophet: alternative forecaster.
 extras = ["xgboost", "lightgbm", "umap-learn", "prophet"]
+# TabICL v2 tabular foundation model — opt-in `backend="tabicl"` for
+# train_classifier / train_regressor. Fully open, commercial use permitted;
+# GPU-recommended. Pulls in torch.
+tabicl = ["tabicl>=0.1"]
+# Insight-extraction primitives, imported lazily where used:
+#   mlxtend  → market_basket (association rules)
+#   dowhy    → causal_effect (backdoor estimation + refutation)
+#   ruptures → detect_changepoints (time-series change detection)
+# (explain_metric, rfm, retention_cohorts, compare_periods use core deps only.)
+insights = ["mlxtend", "dowhy", "ruptures"]
 
 [project.scripts]
 tabular = "tabular.cli:main"

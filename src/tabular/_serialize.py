@@ -6,7 +6,9 @@ one place means the two surfaces never diverge on how a result is rendered.
 """
 from __future__ import annotations
 
+import datetime as _dt
 import math
+from decimal import Decimal
 from typing import Any
 
 import numpy as np
@@ -25,6 +27,12 @@ def jsonable(obj: Any) -> Any:
         return [jsonable(v) for v in obj]
     if isinstance(obj, np.generic):
         obj = obj.item()
+    # DuckDB DECIMAL columns come back as Python Decimal, and DATE/TIMESTAMP as
+    # datetime objects — none are JSON-serializable, so coerce them here.
+    if isinstance(obj, Decimal):
+        obj = float(obj)
+    elif isinstance(obj, (_dt.date, _dt.datetime, _dt.time)):
+        return obj.isoformat()
     if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
         return None
     return obj

@@ -83,7 +83,7 @@ def test_small_table_float_is_continuous(tmp_path):
     s = persistence.create_session([_csv(tmp_path, "d.csv", df)], base=tmp_path)
     r = s.table("d").analyze_association("grp", "measure")
     # 'measure' must be treated as continuous -> a group test, not chi-square
-    assert r.method in {"t_test", "anova", "mann_whitney", "kruskal_wallis"}
+    assert r.method in {"welch_t_test", "anova", "mann_whitney", "kruskal_wallis"}
 
 
 # --- #7: explain_prediction reachable from the CLI (and MCP) -------------- #

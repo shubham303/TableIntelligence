@@ -98,6 +98,78 @@ def forecast(
     )
 
 
+def detect_changepoints(
+    store: Any,
+    time_column: str,
+    value_column: str,
+    penalty: float = 10.0,
+) -> Result:
+    """Detect points in time where the series' behaviour shifts ("sales broke on X").
+
+    Library: **ruptures** (PELT with an RBF cost), imported lazily via the optional
+    ``insights`` extra. We return the change *times* plus each segment's mean so a
+    finding can read "mean dropped from A to B after <date>".
+
+    Args:
+        store: The Store/Table instance.
+        time_column: Datetime column (the time axis).
+        value_column: Numeric column to scan for shifts.
+        penalty: PELT penalty — higher = fewer, more confident changepoints.
+
+    Returns:
+        Result with ``changepoints`` (times) and ``segments`` (start/end/mean).
+    """
+    try:
+        import ruptures as rpt
+    except ImportError as exc:  # pragma: no cover - optional extra
+        raise ImportError(
+            "detect_changepoints needs ruptures. Install it with:  pip install 'tabular[insights]'."
+        ) from exc
+
+    frame = store.get_frame()[[time_column, value_column]].copy()
+    frame[time_column] = pd.to_datetime(frame[time_column], errors="coerce")
+    frame = frame.dropna().sort_values(time_column).reset_index(drop=True)
+    values = pd.to_numeric(frame[value_column], errors="coerce")
+    frame = frame[values.notna()].reset_index(drop=True)
+    signal = frame[value_column].astype(float).to_numpy()
+    if signal.size < 4:
+        raise ValueError(
+            f"detect_changepoints needs at least 4 valid observations; got {signal.size}."
+        )
+
+    algo = rpt.Pelt(model="rbf").fit(signal)
+    bkps = algo.predict(pen=penalty)  # indices; last is len(signal)
+
+    times = frame[time_column]
+    change_times = [times.iloc[i].isoformat() for i in bkps[:-1]]
+    bounds = [0, *bkps]
+    segments = []
+    for start, end in zip(bounds[:-1], bounds[1:]):
+        seg = signal[start:end]
+        segments.append({
+            "start": times.iloc[start].isoformat(),
+            "end": times.iloc[end - 1].isoformat(),
+            "mean": float(seg.mean()),
+            "n": int(seg.size),
+        })
+
+    summary = (
+        f"{len(change_times)} changepoint(s) in {value_column}"
+        + (f"; first at {change_times[0]}" if change_times else "")
+    )
+    return Result(
+        method="ruptures_pelt_rbf",
+        summary=summary,
+        values={"changepoints": change_times, "segments": segments},
+        metadata={
+            "time_column": time_column,
+            "value_column": value_column,
+            "penalty": penalty,
+            "n_points": int(signal.size),
+        },
+    )
+
+
 def _ordered_series(store: Any, time_column: str, value_column: str) -> pd.Series:
     """Return the value column as a numeric Series ordered by the time column."""
     frame = store.get_frame()[[time_column, value_column]].copy()

@@ -26,9 +26,15 @@ from typing import Any
 from . import _ducktable
 from .analytics import (
     association,
+    basket,
+    causal,
     clustering,
+    cohort,
+    compare,
     descriptive,
     dimreduction,
+    feature_computation,
+    insights,
     interpretation,
     supervised,
     timeseries,
@@ -51,6 +57,34 @@ _RESERVED = frozenset({
     "true", "union", "unique", "unpivot", "using", "user", "values", "view",
     "when", "where", "window", "with",
 })
+
+
+# DuckDB column types accepted by create_table's schema. Each may carry a
+# parenthesised precision/length (e.g. DECIMAL(10,2), VARCHAR(50)); the regex
+# below enforces that shape so a "type" can never smuggle in arbitrary DDL.
+_ALLOWED_TYPES = frozenset({
+    "boolean", "bool", "tinyint", "smallint", "integer", "int", "bigint",
+    "hugeint", "utinyint", "usmallint", "uinteger", "ubigint", "real", "float",
+    "double", "decimal", "numeric", "varchar", "char", "text", "string", "blob",
+    "date", "time", "timestamp", "timestamptz", "interval", "uuid", "json",
+})
+_TYPE_RE = re.compile(r"^([a-z]+)(\s*\(\s*\d+\s*(?:,\s*\d+\s*)?\))?$", re.IGNORECASE)
+
+
+def _validate_type(sql_type: str) -> str:
+    """Validate an agent-supplied column type against the allowlist; return it.
+
+    Guards the one spot where caller text is spliced into DDL. Raises ValueError
+    on anything that is not a known base type optionally followed by a numeric
+    precision, so create_table can never execute injected SQL.
+    """
+    match = _TYPE_RE.match(sql_type.strip())
+    if not match or match.group(1).lower() not in _ALLOWED_TYPES:
+        raise ValueError(
+            f"Unsupported column type {sql_type!r}. Allowed: {sorted(_ALLOWED_TYPES)} "
+            f"(optionally with a numeric precision, e.g. DECIMAL(10,2))."
+        )
+    return sql_type.strip()
 
 
 def _sanitize(name: str) -> str:
@@ -90,14 +124,55 @@ class Table:
         """Full table as a pandas DataFrame in stable _ti_row order."""
         return _ducktable.frame_in_order(self._ws._ibis, self._internal)
 
+    def count_rows(self) -> int:
+        """Row count via an in-database COUNT(*) — cheap, no rows materialized."""
+        return _ducktable.count_rows(self._ws._ibis, self._view)
+
+    def count_non_null(self, column: str) -> int:
+        """Count of non-NULL values in a column, computed inside DuckDB."""
+        return _ducktable.count_non_null(self._ws._ibis, self._view, column)
+
     def run_sql(self, query: str) -> Any:
         """Run SQL across the whole workspace (all tables are visible by name)."""
         return self._ws.run_sql(query)
 
-    def write_back_column(self, name: str, values: Any) -> None:
-        """Add or replace a column by row position (see _ducktable.write_back)."""
+    def write_back_column(self, name: str, values: Any, feature: bool = False) -> None:
+        """Add or replace a column by row position (see _ducktable.write_back).
+
+        ``feature`` declares intent for downstream modelling. Written-back columns
+        are computed annotations (outlier flags, cluster labels, predictions) and
+        default to ``feature=False`` — recorded in the derived-column registry and
+        skipped by feature_columns so they never leak into a feature matrix. Pass
+        ``feature=True`` for derived columns that ARE meant to be features (e.g. the
+        components from reduce_dimensions, to cluster/train on afterwards).
+        """
         _ducktable.write_back(self._ws._ibis, self._internal, self._view, name, values)
         self._table = self._ws._ibis.table(self._view)
+        if feature:
+            _ducktable.unregister_derived(self._ws._ibis, self.name, name)
+        else:
+            _ducktable.register_derived(self._ws._ibis, self.name, name)
+
+    def add_computed_column(self, name: str, expression: str, feature: bool = True) -> int:
+        """Materialize a SQL scalar expression as a new column, in-database.
+
+        The computation runs inside DuckDB over the stored table (nothing is pulled
+        into the app), so it scales to arbitrarily large tables. The expression is
+        validated to be a single scalar over the table's columns. Returns the count
+        of non-null values. ``feature`` controls registry membership exactly like
+        write_back_column (default True = a real, model-eligible feature).
+        """
+        n = _ducktable.add_computed_column(self._ws._ibis, self._internal, self._view, name, expression)
+        self._table = self._ws._ibis.table(self._view)
+        if feature:
+            _ducktable.unregister_derived(self._ws._ibis, self.name, name)
+        else:
+            _ducktable.register_derived(self._ws._ibis, self.name, name)
+        return n
+
+    def derived_columns(self) -> set[str]:
+        """Names of this table's derived (non-feature) columns; see write_back_column."""
+        return _ducktable.derived_columns(self._ws._ibis, self.name)
 
     # --- descriptive ------------------------------------------------------ #
 
@@ -109,6 +184,41 @@ class Table:
 
     def association_matrix(self) -> Result:
         return descriptive.association_matrix(self)
+
+    # --- feature computation (build new model-eligible columns) ----------- #
+
+    def combine_columns(self, col_a: str, col_b: str, op: str, name: str | None = None) -> Result:
+        return feature_computation.combine_columns(self, col_a, col_b, op, name)
+
+    def transform_column(self, column: str, func: str, name: str | None = None) -> Result:
+        return feature_computation.transform_column(self, column, func, name)
+
+    def bin_column(
+        self, column: str, n_bins: int = 4, strategy: str = "quantile", name: str | None = None
+    ) -> Result:
+        return feature_computation.bin_column(self, column, n_bins, strategy, name)
+
+    def expand_datetime(self, column: str, parts: list[str] | None = None) -> Result:
+        return feature_computation.expand_datetime(self, column, parts)
+
+    def group_aggregate(
+        self,
+        group_by: str,
+        value: str,
+        agg: str = "mean",
+        name: str | None = None,
+        add_deviation: bool = False,
+    ) -> Result:
+        return feature_computation.group_aggregate(self, group_by, value, agg, name, add_deviation)
+
+    def row_aggregate(self, columns: list[str], agg: str = "sum", name: str | None = None) -> Result:
+        return feature_computation.row_aggregate(self, columns, agg, name)
+
+    def normalize_fractions(self, columns: list[str], suffix: str = "_frac") -> Result:
+        return feature_computation.normalize_fractions(self, columns, suffix)
+
+    def compute_feature(self, name: str, expression: str) -> Result:
+        return feature_computation.compute_feature(self, name, expression)
 
     # --- association ------------------------------------------------------ #
 
@@ -125,13 +235,13 @@ class Table:
 
     # --- supervised ------------------------------------------------------- #
 
-    def train_classifier(self, target: str, name: str | None = None) -> Any:
-        model = supervised.train_classifier(self, target)
+    def train_classifier(self, target: str, name: str | None = None, backend: str = "gbt") -> Any:
+        model = supervised.train_classifier(self, target, backend=backend)
         self.models[name or target] = model
         return model
 
-    def train_regressor(self, target: str, name: str | None = None) -> Any:
-        model = supervised.train_regressor(self, target)
+    def train_regressor(self, target: str, name: str | None = None, backend: str = "gbt") -> Any:
+        model = supervised.train_regressor(self, target, backend=backend)
         self.models[name or target] = model
         return model
 
@@ -171,6 +281,40 @@ class Table:
 
     def forecast(self, time_column: str, value_column: str, horizon: int = 10) -> Result:
         return timeseries.forecast(self, time_column, value_column, horizon)
+
+    def detect_changepoints(self, time_column: str, value_column: str, penalty: float = 10.0) -> Result:
+        return timeseries.detect_changepoints(self, time_column, value_column, penalty)
+
+    # --- insight primitives ----------------------------------------------- #
+
+    def explain_metric(self, target: str, max_depth: int = 3) -> Result:
+        return insights.explain_metric(self, target, max_depth)
+
+    def market_basket(
+        self,
+        transaction_column: str,
+        item_column: str,
+        min_support: float = 0.01,
+        min_confidence: float = 0.2,
+        max_rules: int = 50,
+    ) -> Result:
+        return basket.market_basket(
+            self, transaction_column, item_column, min_support, min_confidence, max_rules
+        )
+
+    def causal_effect(
+        self, treatment: str, outcome: str, confounders: list[str] | None = None
+    ) -> Result:
+        return causal.causal_effect(self, treatment, outcome, confounders)
+
+    def rfm(self, customer_column: str, date_column: str, monetary_column: str) -> Result:
+        return cohort.rfm(self, customer_column, date_column, monetary_column)
+
+    def retention_cohorts(self, customer_column: str, date_column: str) -> Result:
+        return cohort.retention_cohorts(self, customer_column, date_column)
+
+    def compare_periods(self, time_column: str, value_column: str, split: str | None = None) -> Result:
+        return compare.compare_periods(self, time_column, value_column, split)
 
     # --- internals -------------------------------------------------------- #
 
@@ -261,18 +405,53 @@ class Workspace:
         from .relationships import detect_relationships
         return detect_relationships(self)
 
-    def create_table(self, name: str, select_sql: str) -> Table:
-        """Materialize an arbitrary SELECT as a new named table; return its handle.
+    def create_table(
+        self,
+        name: str,
+        columns: list[tuple[str, str]] | None = None,
+        select_sql: str | None = None,
+    ) -> Table:
+        """Create a new named table, either from a schema or from a SELECT.
 
-        The escape hatch behind join(): any query over the workspace's tables can
-        be frozen into a real table that every single-table analytic then works on.
+        Two mutually exclusive modes:
+
+        - ``columns``: a list of ``(column_name, sql_type)`` pairs defining an
+          empty, well-structured table. This is the target when the source data
+          is messy: define the clean schema here, then copy rows in with
+          ``insert_into`` (one query or many). Types are validated against a
+          fixed allowlist.
+        - ``select_sql``: materialize an arbitrary query over the workspace's
+          tables as a new table in a single shot (the escape hatch behind join).
+
+        Either way the result is a normal table that every single-table analytic
+        works on. Returns its handle.
         """
+        if (columns is None) == (select_sql is None):
+            raise ValueError("Pass exactly one of `columns` (empty schema) or `select_sql`.")
         table_name = self._unique_name(_sanitize(name))
         internal = f"_tbl_{table_name}"
-        _ducktable.create_from_query(self._ibis, select_sql, internal, table_name)
+        if columns is not None:
+            typed = [(str(col), _validate_type(str(sql_type))) for col, sql_type in columns]
+            if not typed:
+                raise ValueError("`columns` must define at least one column.")
+            _ducktable.create_empty(self._ibis, typed, internal, table_name)
+        else:
+            _ducktable.create_from_query(self._ibis, select_sql, internal, table_name)
         table = Table(self, table_name, internal, table_name)
         self._tables[table_name] = table
         return table
+
+    def insert_into(self, name: str, source_sql: str) -> int:
+        """Copy rows into an existing table from a SELECT/VALUES query.
+
+        The partner of create_table's schema mode: point ``source_sql`` at the
+        messy source (``SELECT trim(col), CAST(...) FROM raw WHERE ...``) or supply
+        literal ``VALUES`` rows, and the columns map positionally to the target's
+        own columns while ``_ti_row`` is assigned automatically. Call it repeatedly
+        to build a table up incrementally. Returns the number of rows inserted.
+        """
+        table = self.table(name)  # validates the name exists
+        return _ducktable.insert_select(self._ibis, table._internal, source_sql)
 
     def join(
         self,
@@ -305,7 +484,7 @@ class Workspace:
         from_sql = self._build_join_sql(tables, graph, how)
         projection = self._build_projection(tables)
         select_sql = f"SELECT {projection} FROM {from_sql}"
-        return self.create_table(name or "join_" + "_".join(tables), select_sql)
+        return self.create_table(name or "join_" + "_".join(tables), select_sql=select_sql)
 
     def _build_join_sql(self, tables: list[str], graph: Any, how: str) -> str:
         """Chain tables together on FK↔PK edges, greedily from the first table."""
@@ -330,7 +509,7 @@ class Workspace:
             else:
                 raise ValueError(
                     f"No foreign-key path connects {remaining} to {joined}. "
-                    "Use create_table(name, sql) for a manual join."
+                    "Use create_table(name, select_sql=...) for a manual join."
                 )
         return from_sql
 

@@ -114,6 +114,8 @@ check it here.
 ### Phase 4 — Supervised learning
 - [x] `train_classifier` — fast lane, single model, proper split (returns `TrainedModel`)
 - [x] `train_regressor` — fast lane, single model, proper split
+- [x] `backend="tabicl"` — opt-in TabICL v2 tabular foundation model (in-context
+  learning, no per-task training; needs the `tabicl` extra). Default `backend="gbt"`.
 - [x] `TrainedModel.predict` / `.predict_proba` — bundled preprocessing
 - [x] `evaluate` — full metric set + confusion matrix
 - [x] `add_predictions` — write a model's predictions back as a column
@@ -130,6 +132,15 @@ check it here.
 ### Phase 7 — Time series  *(optional; only if tables have a time axis)*
 - [x] `decompose` — trend / seasonality / residual
 - [x] `forecast` — ARIMA / Prophet *(ARIMA via statsmodels; Prophet optional)*
+- [x] `detect_changepoints` — where a series shifts *(ruptures; `insights` extra)*
+
+### Phase 8 — Insight-extraction primitives  *(the "so what / why / what to do" layer)*
+- [x] `explain_metric` — ranked key drivers + segment rules *(shallow sklearn tree)*
+- [x] `market_basket` — association-rule / cross-sell mining *(mlxtend; `insights` extra)*
+- [x] `causal_effect` — backdoor effect estimate + refutation *(DoWhy; `insights` extra)*
+- [x] `rfm` — Recency/Frequency/Monetary quintile segmentation *(pandas)*
+- [x] `retention_cohorts` — monthly cohort retention matrix *(pandas)*
+- [x] `compare_periods` — before/after shift with significance + effect size *(scipy)*
 
 ### Later — large-data + orchestration  *(beyond V0)*
 - [ ] large-data strategies (sampling, out-of-core, approximate methods)

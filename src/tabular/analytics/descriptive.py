@@ -72,15 +72,20 @@ def profile(store: Any) -> Result:
 def detect_outliers(store: Any, column: str) -> Result:
     """Flag outliers in a numeric column via IQR and z-score, write the flags back.
 
-    A row is flagged if either method flags it. The union is written back as a
-    boolean column ``<column>_is_outlier`` so follow-ups are ordinary queries.
+    A row is flagged if either method flags it. Two columns are written back so
+    follow-ups stay ordinary queries:
+
+    - ``<column>_is_outlier`` (boolean): the union of both methods.
+    - ``<column>_outlier_method`` (text): which method(s) flagged the row —
+      ``"iqr"``, ``"zscore"``, or ``"both"``; ``None`` for non-outliers. This lets
+      an agent ask "show only the z-score-flagged rows" without re-running anything.
 
     Args:
         store: The Store instance holding the table.
         column: Name of the numeric column to analyze.
 
     Returns:
-        Result with per-method counts, the thresholds used, and the flag column name.
+        Result with per-method counts, the thresholds used, and the flag column names.
     """
     kind = classify_column(column, store)
     if kind != "continuous":
@@ -98,25 +103,40 @@ def detect_outliers(store: Any, column: str) -> Result:
     z = (values - mean) / std if std and not np.isnan(std) else values * 0
     z_flag = z.abs() > 3.0
 
-    combined = (iqr_flag | z_flag).fillna(False)
-    flag_col = f"{column}_is_outlier"
-    store.write_back_column(flag_col, combined.tolist())
+    iqr_flag = iqr_flag.fillna(False)
+    z_flag = z_flag.fillna(False)
+    combined = iqr_flag | z_flag
 
+    # Per-row attribution: which method(s) caught each outlier (None if neither),
+    # so "which rows did only z-score flag?" is a plain query on the written column.
+    both = iqr_flag & z_flag
+    method = np.where(
+        both, "both", np.where(iqr_flag, "iqr", np.where(z_flag, "zscore", None))
+    )
+
+    flag_col = f"{column}_is_outlier"
+    method_col = f"{column}_outlier_method"
+    store.write_back_column(flag_col, combined.tolist())
+    store.write_back_column(method_col, method.tolist())
+
+    n_both = int(both.sum())
     return Result(
         method="outlier_iqr_zscore",
         summary=(
             f"{int(combined.sum())} outliers in {column} "
-            f"(IQR: {int(iqr_flag.fillna(False).sum())}, z-score: {int(z_flag.fillna(False).sum())})"
+            f"(IQR: {int(iqr_flag.sum())}, z-score: {int(z_flag.sum())}, both: {n_both})"
         ),
         values={
             "n_outliers": int(combined.sum()),
-            "n_outliers_iqr": int(iqr_flag.fillna(False).sum()),
-            "n_outliers_zscore": int(z_flag.fillna(False).sum()),
+            "n_outliers_iqr": int(iqr_flag.sum()),
+            "n_outliers_zscore": int(z_flag.sum()),
+            "n_outliers_both": n_both,
         },
         metadata={
             "iqr_bounds": [float(low), float(high)],
             "zscore_threshold": 3.0,
             "flag_column": flag_col,
+            "method_column": method_col,
         },
     )
 
@@ -134,7 +154,16 @@ def association_matrix(store: Any) -> Result:
     Returns:
         Result with a symmetric strength matrix and the measure/method per pair.
     """
-    cols = [c for c in store._table.schema() if classify_column(c, store) in _ASSOCIABLE]
+    # Skip derived annotations (outlier flags, cluster labels, predictions): they
+    # are computed columns, not real variables, so their association with the
+    # source data is an artifact rather than a finding. See write_back_column.
+    get_derived = getattr(store, "derived_columns", None)
+    derived = get_derived() if get_derived else set()
+    cols = [
+        c
+        for c in store._table.schema()
+        if c not in derived and classify_column(c, store) in _ASSOCIABLE
+    ]
     # Uncomputed/skipped cells stay None (not np.nan) so Result.values serializes
     # to valid, lossless JSON — a bare NaN token is invalid JSON and model_dump_json
     # would otherwise coerce it to null, erasing the not-computed distinction.

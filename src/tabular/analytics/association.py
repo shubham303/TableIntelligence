@@ -7,7 +7,7 @@ analyze_association routes to the correct test purely from the dtype pair:
         → Spearman correlation  (otherwise)
 
     categorical × continuous:
-        → Independent t-test    (2 groups, normal + equal variance)
+        → Welch's t-test        (2 groups, normal + enough samples; no equal-variance assumption)
         → One-way ANOVA         (3+ groups, normal + equal variance)
         → Mann-Whitney U        (2 groups, assumptions fail)
         → Kruskal-Wallis        (3+ groups, assumptions fail)
@@ -150,41 +150,50 @@ def _categorical_continuous(frame: pd.DataFrame, cat_col: str, num_col: str) -> 
     normal = all(assumptions.is_normal(g) for g in groups)
     equal_var = assumptions.has_equal_variance(*groups)
     sized = assumptions.enough_samples(*groups)
-    parametric = normal and equal_var and sized
 
-    if parametric and k == 2:
-        method = "t_test"
-        stat, p = stats.ttest_ind(groups[0], groups[1], equal_var=True)
-    elif parametric and k > 2:
+    if k == 2 and normal and sized:
+        # Welch's t-test: does NOT assume equal variance, so it's the robust
+        # default — nearly as powerful as Student's when variances are equal and
+        # correct when they aren't. Equal variance is therefore not a gate here.
+        method = "welch_t_test"
+        stat, p = stats.ttest_ind(groups[0], groups[1], equal_var=False)
+        parametric = True
+    elif k > 2 and normal and equal_var and sized:
+        # Standard one-way ANOVA does assume equal variance, so keep that gate.
         method = "anova"
         stat, p = stats.f_oneway(*groups)
-    elif not parametric and k == 2:
+        parametric = True
+    elif k == 2:
         method = "mann_whitney"
         stat, p = stats.mannwhitneyu(groups[0], groups[1], alternative="two-sided")
+        parametric = False
     else:
         method = "kruskal_wallis"
         stat, p = stats.kruskal(*groups)
+        parametric = False
 
+    values = {"statistic": float(stat), "p_value": float(p), "n_groups": int(k)}
     if parametric:
         effect = _eta_squared(groups)
         measure = "eta_squared"
+        # omega² is the less-biased companion to eta² on the parametric path.
+        omega = _omega_squared(groups)
+        values["omega_squared"] = omega
+        effect_note = f"eta_squared={effect:.3f}, omega_squared={omega:.3f}"
     else:
         effect = _epsilon_squared(groups)
         measure = "epsilon_squared"
+        effect_note = f"{measure}={effect:.3f}"
+    values["effect_size"] = float(effect)
 
     sig = "significant" if p < 0.05 else "no significant"
     return Result(
         method=method,
         summary=(
             f"{sig} difference in {num_col} across {cat_col} "
-            f"({k} groups, {measure}={effect:.3f}, p={p:.3g})"
+            f"({k} groups, {effect_note}, p={p:.3g})"
         ),
-        values={
-            "statistic": float(stat),
-            "p_value": float(p),
-            "effect_size": float(effect),
-            "n_groups": int(k),
-        },
+        values=values,
         metadata={
             "dtype_a": "categorical",
             "dtype_b": "continuous",
@@ -252,6 +261,30 @@ def _eta_squared(groups: list[np.ndarray]) -> float:
     ss_total = np.sum((all_vals - grand) ** 2)
     ss_between = np.sum([g.size * (g.mean() - grand) ** 2 for g in groups])
     return float(ss_between / ss_total) if ss_total > 0 else 0.0
+
+
+def _omega_squared(groups: list[np.ndarray]) -> float:
+    """omega² — a less-biased estimator of variance explained than eta².
+
+    ω² = (SS_between - df_between·MS_within) / (SS_total + MS_within), the standard
+    one-way (fixed-effects) form. eta² overstates the effect (it's the sample
+    proportion); ω² subtracts the variance the grouping would explain by chance, so
+    it's the better population estimate — notably at small n. It can come out
+    slightly negative when the true effect is ~0; clamp to 0 by convention.
+    """
+    all_vals = np.concatenate(groups)
+    n, k = all_vals.size, len(groups)
+    df_between, df_within = k - 1, n - k
+    if df_within <= 0:
+        return 0.0
+    grand = all_vals.mean()
+    ss_total = np.sum((all_vals - grand) ** 2)
+    ss_between = np.sum([g.size * (g.mean() - grand) ** 2 for g in groups])
+    ms_within = (ss_total - ss_between) / df_within
+    denom = ss_total + ms_within
+    if denom <= 0:
+        return 0.0
+    return float(max(0.0, (ss_between - df_between * ms_within) / denom))
 
 
 def _epsilon_squared(groups: list[np.ndarray]) -> float:

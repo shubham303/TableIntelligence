@@ -42,6 +42,18 @@ def test_analytics_by_session_key(tmp_path):
     assert M.cluster(key, "customers", 3)["values"]["n_clusters"] == 3
 
 
+def test_feature_computation_tools_build_model_eligible_columns(tmp_path):
+    key = M.create_session(_fixtures(tmp_path, "employees.csv"))["session_key"]
+    r = M.combine_columns(key, "employees", "salary", "years_at_company", "divide", name="rate")
+    assert r["values"]["column"] == "rate"
+    M.group_aggregate(key, "employees", "department", "salary", "mean", add_deviation=True)
+    cols = M.run_sql(key, "SELECT * FROM employees LIMIT 1")["rows"][0].keys()
+    assert {"rate", "salary_mean_by_department", "salary_dev_from_department"} <= set(cols)
+    # Engineered columns are features, so training picks them up (not excluded).
+    fi = M.train_regressor(key, "employees", "salary", name="m")
+    assert fi is not None
+
+
 def test_train_evaluate_persist_across_cache_eviction(tmp_path):
     key = M.create_session(_fixtures(tmp_path, "loan_applications.csv"))["session_key"]
     M.train_classifier(key, "loan_applications", "is_approved", name="m")
@@ -55,12 +67,35 @@ def test_join_then_analyze(tmp_path):
     j = M.join(key, ["orders", "customers"], name="enriched")
     assert j["table"] == "enriched" and j["n_rows"] == 80
     r = M.analyze_association(key, "enriched", "order_total", "tier")
-    assert r["method"] in {"t_test", "anova", "mann_whitney", "kruskal_wallis"}
+    assert r["method"] in {"welch_t_test", "anova", "mann_whitney", "kruskal_wallis"}
 
 
 def test_unknown_session_raises(tmp_path):
     with pytest.raises(FileNotFoundError):
         M.profile("s_deadbeef", "x")
+
+
+def test_scratchpad_requires_live_session(tmp_path, monkeypatch):
+    from tabular import scratchpad
+
+    monkeypatch.setattr(scratchpad, "_DIR", tmp_path / ".tableintelligence")
+    # No active session for this key → every scratchpad op must raise.
+    with pytest.raises(FileNotFoundError):
+        M.scratchpad_add("s_deadbeef", "note")
+    with pytest.raises(FileNotFoundError):
+        M.scratchpad_read("s_deadbeef")
+    with pytest.raises(FileNotFoundError):
+        M.scratchpad_search("s_deadbeef", "q")
+
+
+def test_scratchpad_add_read_with_live_session(tmp_path, monkeypatch):
+    from tabular import scratchpad
+
+    monkeypatch.setattr(scratchpad, "_DIR", tmp_path / ".tableintelligence")
+    key = M.create_session(_fixtures(tmp_path, "customers.csv"))["session_key"]
+    M.scratchpad_add(key, "customers skew young")
+    assert "customers skew young" in M.scratchpad_read(key)["text"]
+    assert M.scratchpad_search(key, "SKEW")["matches"]
 
 
 # --- protocol wiring ------------------------------------------------------- #

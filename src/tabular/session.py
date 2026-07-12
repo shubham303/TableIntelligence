@@ -92,15 +92,35 @@ class Session:
         """
         return self.workspace.join(tables, name=name, how=how)
 
-    def create_table(self, name: str, select_sql: str) -> Table:
-        """Materialize an arbitrary SELECT over the workspace as a new table."""
-        return self.workspace.create_table(name, select_sql)
+    def create_table(
+        self,
+        name: str,
+        columns: list[tuple[str, str]] | None = None,
+        select_sql: str | None = None,
+    ) -> Table:
+        """Create a new table from a column schema or from a SELECT.
+
+        Pass ``columns`` (``(name, type)`` pairs) to define an empty structured
+        table to copy messy data into with ``insert_into``, or ``select_sql`` to
+        materialize a query in one shot.
+        """
+        return self.workspace.create_table(name, columns=columns, select_sql=select_sql)
+
+    def insert_into(self, name: str, source_sql: str) -> int:
+        """Copy rows into an existing table from a SELECT/VALUES query; return the count."""
+        return self.workspace.insert_into(name, source_sql)
 
     def run_sql(self, query: str) -> Any:
         """Run SQL across the workspace; every table is visible by its name."""
         return self.workspace.run_sql(query)
 
     # --- single-table convenience (delegates to the sole table) ----------- #
+
+    def count_rows(self) -> int:
+        return self._sole().count_rows()
+
+    def count_non_null(self, column: str) -> int:
+        return self._sole().count_non_null(column)
 
     def profile(self) -> Result:
         return self._sole().profile()
@@ -111,6 +131,39 @@ class Session:
     def association_matrix(self) -> Result:
         return self._sole().association_matrix()
 
+    def combine_columns(self, col_a: str, col_b: str, op: str, name: str | None = None) -> Result:
+        return self._sole().combine_columns(col_a, col_b, op, name)
+
+    def transform_column(self, column: str, func: str, name: str | None = None) -> Result:
+        return self._sole().transform_column(column, func, name)
+
+    def bin_column(
+        self, column: str, n_bins: int = 4, strategy: str = "quantile", name: str | None = None
+    ) -> Result:
+        return self._sole().bin_column(column, n_bins, strategy, name)
+
+    def expand_datetime(self, column: str, parts: list[str] | None = None) -> Result:
+        return self._sole().expand_datetime(column, parts)
+
+    def group_aggregate(
+        self,
+        group_by: str,
+        value: str,
+        agg: str = "mean",
+        name: str | None = None,
+        add_deviation: bool = False,
+    ) -> Result:
+        return self._sole().group_aggregate(group_by, value, agg, name, add_deviation)
+
+    def row_aggregate(self, columns: list[str], agg: str = "sum", name: str | None = None) -> Result:
+        return self._sole().row_aggregate(columns, agg, name)
+
+    def normalize_fractions(self, columns: list[str], suffix: str = "_frac") -> Result:
+        return self._sole().normalize_fractions(columns, suffix)
+
+    def compute_feature(self, name: str, expression: str) -> Result:
+        return self._sole().compute_feature(name, expression)
+
     def analyze_association(self, col_a: str, col_b: str) -> Result:
         return self._sole().analyze_association(col_a, col_b)
 
@@ -120,11 +173,11 @@ class Session:
     def profile_clusters(self) -> Result:
         return self._sole().profile_clusters()
 
-    def train_classifier(self, target: str, name: str | None = None) -> Any:
-        return self._sole().train_classifier(target, name)
+    def train_classifier(self, target: str, name: str | None = None, backend: str = "gbt") -> Any:
+        return self._sole().train_classifier(target, name, backend=backend)
 
-    def train_regressor(self, target: str, name: str | None = None) -> Any:
-        return self._sole().train_regressor(target, name)
+    def train_regressor(self, target: str, name: str | None = None, backend: str = "gbt") -> Any:
+        return self._sole().train_regressor(target, name, backend=backend)
 
     def evaluate(self, model_name: str) -> Result:
         return self._sole().evaluate(model_name)
@@ -146,6 +199,38 @@ class Session:
 
     def forecast(self, time_column: str, value_column: str, horizon: int = 10) -> Result:
         return self._sole().forecast(time_column, value_column, horizon)
+
+    def detect_changepoints(self, time_column: str, value_column: str, penalty: float = 10.0) -> Result:
+        return self._sole().detect_changepoints(time_column, value_column, penalty)
+
+    def explain_metric(self, target: str, max_depth: int = 3) -> Result:
+        return self._sole().explain_metric(target, max_depth)
+
+    def market_basket(
+        self,
+        transaction_column: str,
+        item_column: str,
+        min_support: float = 0.01,
+        min_confidence: float = 0.2,
+        max_rules: int = 50,
+    ) -> Result:
+        return self._sole().market_basket(
+            transaction_column, item_column, min_support, min_confidence, max_rules
+        )
+
+    def causal_effect(
+        self, treatment: str, outcome: str, confounders: list[str] | None = None
+    ) -> Result:
+        return self._sole().causal_effect(treatment, outcome, confounders)
+
+    def rfm(self, customer_column: str, date_column: str, monetary_column: str) -> Result:
+        return self._sole().rfm(customer_column, date_column, monetary_column)
+
+    def retention_cohorts(self, customer_column: str, date_column: str) -> Result:
+        return self._sole().retention_cohorts(customer_column, date_column)
+
+    def compare_periods(self, time_column: str, value_column: str, split: str | None = None) -> Result:
+        return self._sole().compare_periods(time_column, value_column, split)
 
     @property
     def models(self) -> dict[str, Any]:

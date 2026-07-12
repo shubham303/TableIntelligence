@@ -22,15 +22,20 @@ import json
 import os
 import pickle
 import re
+import secrets
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
 
 from .session import Session
 from .workspace import Workspace
 
 _SESSIONS_SUBDIR = Path(".tableint") / "sessions"
+
+# nanoid-style key: short, URL/filename-safe, collision-resistant. Alphanumeric
+# only (no -/_), so a key is safe as a directory name and a bare CLI argument.
+_NANOID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+_NANOID_SIZE = 12
 
 
 def _root(base: str | Path | None) -> Path:
@@ -52,8 +57,8 @@ def _safe(name: str) -> str:
 
 
 def new_session_key() -> str:
-    """Mint a fresh, opaque session key."""
-    return "s_" + uuid4().hex[:8]
+    """Mint a fresh, opaque session key — an ``s_`` prefix plus a nanoid body."""
+    return "s_" + "".join(secrets.choice(_NANOID_ALPHABET) for _ in range(_NANOID_SIZE))
 
 
 def create_session(

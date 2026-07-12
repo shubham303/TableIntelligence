@@ -50,10 +50,17 @@ def feature_columns(
     Returns:
         (numeric_columns, categorical_columns).
     """
+    # Derived annotations (outlier flags, cluster labels, predictions) are never
+    # features — drop them alongside the caller's explicit excludes so they can't
+    # leak into a model. reduce_dimensions marks its components feature=True, so
+    # those stay eligible.
+    get_derived = getattr(store, "derived_columns", None)
+    excluded = set(exclude) | (get_derived() if get_derived else set())
+
     numeric: list[str] = []
     categorical: list[str] = []
     for name in store._table.schema():
-        if name in exclude:
+        if name in excluded:
             continue
         kind = classify_column(name, store)
         if kind in _NUMERIC_TYPES:

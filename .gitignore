@@ -6,3 +6,11 @@ build/
 .pytest_cache/
 .DS_Store
 *.duckdb
+reports/
+datasets/
+# runtime session/store state (generated)
+.tableint/
+
+# scratch / personal drafts
+temp.txt
+*.jpg
