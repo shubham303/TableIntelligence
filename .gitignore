@@ -19,3 +19,4 @@ temp.txt
 .env
 *.env
 control-plane/.env
+.claude-artifacts/
