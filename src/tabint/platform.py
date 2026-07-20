@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
 
 _DEFAULT = "https://shubhamrandive.com"
@@ -76,42 +77,68 @@ def list_folders() -> dict:
 
 
 # --------------------------------------------------------------------------- #
-# outreach — prompts, prospects, and sending (the outreach connector)
+# outreach connector — templates, campaigns, emails, received (data/CRUD only)
 # --------------------------------------------------------------------------- #
 
-def list_outreach_prompts() -> dict:
-    return _request("GET", "/api/outreach/prompts")
+def _qs(params: dict) -> str:
+    items = [(k, v) for k, v in params.items() if v not in (None, "")]
+    return ("?" + urllib.parse.urlencode(items)) if items else ""
 
 
-def create_outreach_prompt(name: str, body: str) -> dict:
-    return _request("POST", "/api/outreach/prompts", {"name": name, "body": body})
+# templates
+def create_template(title: str, prompt: str, status: str = "active") -> dict:
+    return _request("POST", "/api/outreach/templates", {"title": title, "prompt": prompt, "status": status})
+
+def list_templates(status: str | None = None, frm: str | None = None, to: str | None = None) -> dict:
+    return _request("GET", "/api/outreach/templates" + _qs({"status": status, "from": frm, "to": to}))
+
+def get_template(template_id: str) -> dict:
+    return _request("GET", f"/api/outreach/templates/{template_id}")
+
+def update_template(template_id: str, fields: dict) -> dict:
+    return _request("PATCH", f"/api/outreach/templates/{template_id}", fields)
+
+def delete_template(template_id: str) -> dict:
+    return _request("DELETE", f"/api/outreach/templates/{template_id}")
 
 
-def update_outreach_prompt(prompt_id: str, name: str, body: str) -> dict:
-    return _request("PATCH", f"/api/outreach/prompts/{prompt_id}", {"name": name, "body": body})
+# campaigns
+def setup_campaign(template_id: str, title: str | None = None) -> dict:
+    return _request("POST", "/api/outreach/campaigns", {"template_id": template_id, "title": title})
+
+def get_campaign(campaign_id: str) -> dict:
+    return _request("GET", f"/api/outreach/campaigns/{campaign_id}")
+
+def list_campaigns(status: str | None = None, template_id: str | None = None,
+                   frm: str | None = None, to: str | None = None) -> dict:
+    return _request("GET", "/api/outreach/campaigns" + _qs(
+        {"status": status, "template_id": template_id, "from": frm, "to": to}))
 
 
-def delete_outreach_prompt(prompt_id: str) -> dict:
-    return _request("DELETE", f"/api/outreach/prompts/{prompt_id}")
+# emails (prospect + drafted email)
+def add_email(campaign_id: str, recipients, subject: str, body: str,
+              details=None, email_ids=None) -> dict:
+    return _request("POST", "/api/outreach/emails", {
+        "campaign_id": campaign_id, "recipients": recipients, "subject": subject,
+        "body": body, "details": details, "email_ids": email_ids})
+
+def list_emails(campaign_id: str, status: str | None = None) -> dict:
+    return _request("GET", "/api/outreach/emails" + _qs({"campaign_id": campaign_id, "status": status}))
+
+def get_email(email_id: str) -> dict:
+    return _request("GET", f"/api/outreach/emails/{email_id}")
+
+def update_email(email_id: str, fields: dict) -> dict:
+    return _request("PATCH", f"/api/outreach/emails/{email_id}", fields)
+
+def delete_email(email_id: str) -> dict:
+    return _request("DELETE", f"/api/outreach/emails/{email_id}")
 
 
-def list_prospects(status: str | None = None) -> dict:
-    q = f"?status={status}" if status else ""
-    return _request("GET", f"/api/outreach/prospects{q}")
+# received emails (global to the user)
+def save_received(sender: str, subject: str, body: str, received_at: str | None = None) -> dict:
+    return _request("POST", "/api/outreach/received",
+                    {"sender": sender, "subject": subject, "body": body, "received_at": received_at})
 
-
-def create_prospects(prospects: list[dict]) -> dict:
-    """Create one or many prospects in a single call."""
-    return _request("POST", "/api/outreach/prospects", {"prospects": prospects})
-
-
-def get_prospect(prospect_id: str) -> dict:
-    return _request("GET", f"/api/outreach/prospects/{prospect_id}")
-
-
-def update_prospect(prospect_id: str, fields: dict) -> dict:
-    return _request("PATCH", f"/api/outreach/prospects/{prospect_id}", fields)
-
-
-def delete_prospect(prospect_id: str) -> dict:
-    return _request("DELETE", f"/api/outreach/prospects/{prospect_id}")
+def list_received() -> dict:
+    return _request("GET", "/api/outreach/received")

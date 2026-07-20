@@ -187,11 +187,17 @@ def list_folders() -> dict:
 
 
 # --------------------------------------------------------------------------- #
-# outreach connector — manage prompts and prospect data (research + drafted
-# email) on the user's Table Intelligence account. This is a data/CRUD surface
-# only: it does NOT send email. To actually send, use your own email tool
-# (e.g. a Gmail/SMTP MCP), then record the outcome here with
-# outreach_update_prospect (set status to 'sent'/'replied', save reply_text).
+# outreach connector — templates → campaigns → prospect emails, plus received
+# email. A data/CRUD surface on the user's Table Intelligence account; it does
+# NOT send email. Typical flow:
+#   1. outreach_create_template(title, prompt)      — the reusable playbook
+#   2. outreach_setup_campaign(template_id)         — freezes the prompt, empty
+#   3. research prospects on the web, then for each:
+#      outreach_add_email(campaign_id, recipients, subject, body, details, email_ids)
+#   4. user reviews/edits in the dashboard (or via outreach_update_email)
+#   5. send each with your OWN email tool (Gmail/SMTP MCP), then
+#      outreach_update_email(email_id, {"status": "sent"})   — record the result
+#   Skip any email the user deleted/disapproved (it won't be in the list).
 # A paid connector: needs trial/premium.
 # --------------------------------------------------------------------------- #
 
@@ -202,67 +208,131 @@ _NEED_KEY_OUTREACH = {
 }
 
 
+def _cfg(fn, *a, **k):
+    return fn(*a, **k) if _platform.configured() else _NEED_KEY_OUTREACH
+
+
+# ---- templates ----
 @mcp.tool()
 @entitlement.requires_paid
-def outreach_list_prompts() -> dict:
-    """List your saved outreach prompts (the editable campaign playbooks)."""
-    return _platform.list_outreach_prompts() if _platform.configured() else _NEED_KEY_OUTREACH
-
-
-@mcp.tool()
-@entitlement.requires_paid
-def outreach_create_prompt(name: str, body: str) -> dict:
-    """Create a new outreach prompt/playbook the agent can use to draft emails.
-    `body` is the instruction text (tone, structure, qualification rules)."""
-    return _platform.create_outreach_prompt(name, body) if _platform.configured() else _NEED_KEY_OUTREACH
-
-
-@mcp.tool()
-@entitlement.requires_paid
-def outreach_update_prompt(prompt_id: str, name: str, body: str) -> dict:
-    """Update an outreach prompt's name and body."""
-    return _platform.update_outreach_prompt(prompt_id, name, body) if _platform.configured() else _NEED_KEY_OUTREACH
+def outreach_create_template(title: str, prompt: str, status: str = "active") -> dict:
+    """Create a reusable outreach template. `prompt` is the playbook the agent
+    follows when running a campaign (who to target, how to research, tone/structure
+    of the email). status: 'active' or 'inactive'."""
+    return _cfg(_platform.create_template, title, prompt, status)
 
 
 @mcp.tool()
 @entitlement.requires_paid
-def outreach_delete_prompt(prompt_id: str) -> dict:
-    """Delete an outreach prompt by id."""
-    return _platform.delete_outreach_prompt(prompt_id) if _platform.configured() else _NEED_KEY_OUTREACH
+def outreach_list_templates(status: str | None = None, frm: str | None = None, to: str | None = None) -> dict:
+    """List outreach templates. Optional filters: status ('active'/'inactive'),
+    frm/to (ISO date range on created_at)."""
+    return _cfg(_platform.list_templates, status, frm, to)
 
 
 @mcp.tool()
 @entitlement.requires_paid
-def outreach_list_prospects(status: str | None = None) -> dict:
-    """List prospects on the user's account, optionally filtered by status
-    (new, drafted, sent, delivered, bounced, replied, skipped)."""
-    return _platform.list_prospects(status) if _platform.configured() else _NEED_KEY_OUTREACH
+def outreach_get_template(template_id: str) -> dict:
+    """Read one outreach template (title, prompt, status)."""
+    return _cfg(_platform.get_template, template_id)
 
 
 @mcp.tool()
 @entitlement.requires_paid
-def outreach_save_prospects(prospects: list[dict]) -> dict:
-    """Save one or many researched prospects to the user's account for review.
-    Each item may include: name, email, company, research, draft_subject,
-    draft_body, prompt_id, status. The user reviews/edits these in the dashboard
-    before anything is sent."""
-    return _platform.create_prospects(prospects) if _platform.configured() else _NEED_KEY_OUTREACH
+def outreach_update_template(template_id: str, fields: dict) -> dict:
+    """Update a template. `fields` may include title, prompt, status."""
+    return _cfg(_platform.update_template, template_id, fields)
 
 
 @mcp.tool()
 @entitlement.requires_paid
-def outreach_get_prospect(prospect_id: str) -> dict:
-    """Fetch one prospect's full record (research + drafted email + status)."""
-    return _platform.get_prospect(prospect_id) if _platform.configured() else _NEED_KEY_OUTREACH
+def outreach_delete_template(template_id: str) -> dict:
+    """Delete a template by id."""
+    return _cfg(_platform.delete_template, template_id)
+
+
+# ---- campaigns ----
+@mcp.tool()
+@entitlement.requires_paid
+def outreach_setup_campaign(template_id: str, title: str | None = None) -> dict:
+    """Start a new campaign from a template. The template's prompt is COPIED into
+    the campaign (frozen — later template edits don't affect it). The campaign
+    starts empty; add prospects/emails with outreach_add_email."""
+    return _cfg(_platform.setup_campaign, template_id, title)
 
 
 @mcp.tool()
 @entitlement.requires_paid
-def outreach_update_prospect(prospect_id: str, fields: dict) -> dict:
-    """Update a prospect. `fields` may include name, email, company, research,
-    draft_subject, draft_body, status, reply_text, prompt_id. Use this to record
-    a reply (set reply_text and status='replied')."""
-    return _platform.update_prospect(prospect_id, fields) if _platform.configured() else _NEED_KEY_OUTREACH
+def outreach_get_campaign(campaign_id: str) -> dict:
+    """Get a campaign incl. its frozen prompt and all its drafted/sent emails."""
+    return _cfg(_platform.get_campaign, campaign_id)
+
+
+@mcp.tool()
+@entitlement.requires_paid
+def outreach_list_campaigns(status: str | None = None, template_id: str | None = None,
+                            frm: str | None = None, to: str | None = None) -> dict:
+    """List campaigns with optional filters (status, template_id, created_at range)."""
+    return _cfg(_platform.list_campaigns, status, template_id, frm, to)
+
+
+# ---- prospect emails ----
+@mcp.tool()
+@entitlement.requires_paid
+def outreach_add_email(campaign_id: str, recipients, subject: str, body: str,
+                       details: dict | None = None, email_ids: list | None = None) -> dict:
+    """Add a found prospect + its drafted email to a campaign (status 'draft').
+    recipients: the target email(s). details: JSON company/person metadata.
+    email_ids: [{"name":..., "email":...}] contacts found. Call once per prospect
+    as you research them."""
+    return _cfg(_platform.add_email, campaign_id, recipients, subject, body, details, email_ids)
+
+
+@mcp.tool()
+@entitlement.requires_paid
+def outreach_list_emails(campaign_id: str, status: str | None = None) -> dict:
+    """List the emails in a campaign (with prospect details). Filter by status
+    ('draft'/'sent'/'failed'). Read this before sending to get the current set."""
+    return _cfg(_platform.list_emails, campaign_id, status)
+
+
+@mcp.tool()
+@entitlement.requires_paid
+def outreach_get_email(email_id: str) -> dict:
+    """Read one email entry (recipients, subject, body, status, prospect details)."""
+    return _cfg(_platform.get_email, email_id)
+
+
+@mcp.tool()
+@entitlement.requires_paid
+def outreach_update_email(email_id: str, fields: dict) -> dict:
+    """Update an email. `fields` may include recipients, subject, body, status
+    ('draft'/'sent'/'failed'), sent_at. After sending via your own email tool,
+    set status to 'sent' to record it."""
+    return _cfg(_platform.update_email, email_id, fields)
+
+
+@mcp.tool()
+@entitlement.requires_paid
+def outreach_delete_email(email_id: str) -> dict:
+    """Delete/disapprove an email (and its prospect) so it won't be sent."""
+    return _cfg(_platform.delete_email, email_id)
+
+
+# ---- received email (global to the user) ----
+@mcp.tool()
+@entitlement.requires_paid
+def outreach_save_received(sender: str, subject: str, body: str, received_at: str | None = None) -> dict:
+    """Save a received email to the user's account (not campaign-specific).
+    received_at: ISO timestamp (defaults to now)."""
+    return _cfg(_platform.save_received, sender, subject, body, received_at)
+
+
+@mcp.tool()
+@entitlement.requires_paid
+def outreach_list_received() -> dict:
+    """List received emails saved to the user's account."""
+    return _cfg(_platform.list_received)
 
 
 
