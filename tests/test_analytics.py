@@ -7,7 +7,7 @@ import shutil
 
 import pytest
 
-from tabular import Result, Session
+from tabint import Result, Session
 
 
 def _session(fixture: str, tmp_path) -> Session:
@@ -265,7 +265,7 @@ class TestSupervised:
 
     def test_tabicl_rejects_oversized_table(self, tmp_path, monkeypatch):
         """The row-count guard fires before we ever touch the optional model."""
-        from tabular.analytics import supervised
+        from tabint.analytics import supervised
         monkeypatch.setattr(supervised, "_TABICL_MAX_ROWS", 5)
         s = _session("loan_applications.csv", tmp_path)
         with pytest.raises(ValueError, match="up to ~5 rows"):
@@ -393,8 +393,14 @@ class TestCausal:
         except ImportError as exc:
             assert "dowhy" in str(exc).lower()
         else:
-            assert r.method == "dowhy_backdoor_linear_regression"
-            assert "effect" in r.values
+            # Honesty seam: on a small/degenerate fixture the estimator declines
+            # rather than emitting a meaningless effect.
+            if r.trust and r.trust.declined:
+                assert r.method == "causal_effect_declined"
+                assert "effect" not in r.values
+            else:
+                assert r.method == "dowhy_backdoor_linear_regression"
+                assert "effect" in r.values
 
 
 class TestCohort:

@@ -4,7 +4,7 @@ import shutil
 import pandas as pd
 import pytest
 
-from tabular.store import Store
+from tabint.store import Store
 
 CUSTOMERS = "tests/fixtures/customers.csv"
 EMPLOYEES = "tests/fixtures/employees.csv"

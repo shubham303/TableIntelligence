@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from tabular import Session
-from tabular.analytics import association as A
+from tabint import Session
+from tabint.analytics import association as A
 
 
 def _csv(tmp_path, name: str, df: pd.DataFrame) -> str:
@@ -88,7 +88,7 @@ def test_shap_aggregation_no_prefix_collision():
     from sklearn.impute import SimpleImputer
     from sklearn.pipeline import Pipeline
     from sklearn.preprocessing import OneHotEncoder
-    from tabular.analytics.interpretation import _aggregate_to_columns
+    from tabint.analytics.interpretation import _aggregate_to_columns
 
     df = pd.DataFrame({"a": ["b", "c", "b", "c"], "a_b": ["x", "y", "x", "y"]})
     cat = Pipeline([("impute", SimpleImputer(strategy="most_frequent")),

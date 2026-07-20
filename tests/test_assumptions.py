@@ -1,7 +1,7 @@
 """Tests for validation.assumptions — the checks that route test selection."""
 import numpy as np
 
-from tabular.validation import assumptions
+from tabint.validation import assumptions
 
 
 def test_is_normal_true_for_gaussian():

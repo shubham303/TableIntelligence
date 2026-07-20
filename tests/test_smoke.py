@@ -1,12 +1,12 @@
 """Smoke tests: verify the package is importable and skeletons are wired correctly."""
 import pytest
-import tabular
-from tabular import Session, Result
+import tabint
+from tabint import Session, Result
 
 
 def test_import():
     """Package imports without errors."""
-    assert tabular is not None
+    assert tabint is not None
 
 
 def test_session_importable():
@@ -61,4 +61,4 @@ def test_session_analyze_association_runs():
 
 def test_version():
     """Package exposes __version__."""
-    assert tabular.__version__ == "0.0.0"
+    assert tabint.__version__ == "0.1.0"

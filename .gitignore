@@ -14,3 +14,8 @@ datasets/
 # scratch / personal drafts
 temp.txt
 *.jpg
+
+# secrets — never commit connection strings / API keys
+.env
+*.env
+control-plane/.env

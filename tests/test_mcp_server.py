@@ -4,7 +4,7 @@ import shutil
 
 import pytest
 
-from tabular import mcp_server as M
+from tabint import mcp_server as M
 
 
 @pytest.fixture(autouse=True)
@@ -76,7 +76,7 @@ def test_unknown_session_raises(tmp_path):
 
 
 def test_scratchpad_requires_live_session(tmp_path, monkeypatch):
-    from tabular import scratchpad
+    from tabint import scratchpad
 
     monkeypatch.setattr(scratchpad, "_DIR", tmp_path / ".tableintelligence")
     # No active session for this key → every scratchpad op must raise.
@@ -89,7 +89,7 @@ def test_scratchpad_requires_live_session(tmp_path, monkeypatch):
 
 
 def test_scratchpad_add_read_with_live_session(tmp_path, monkeypatch):
-    from tabular import scratchpad
+    from tabint import scratchpad
 
     monkeypatch.setattr(scratchpad, "_DIR", tmp_path / ".tableintelligence")
     key = M.create_session(_fixtures(tmp_path, "customers.csv"))["session_key"]

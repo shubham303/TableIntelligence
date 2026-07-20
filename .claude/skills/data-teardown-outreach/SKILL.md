@@ -4,9 +4,10 @@ description: >
   Find and win data-analysis clients for a solo consultant. Use this whenever the
   user wants to prospect for clients, find businesses to email, build a target list,
   run a "teardown" or free-sample analysis on a company's public data, or draft a
-  cold email — a product-led service pitch backed by a one-line finding from public
-  data. Cold email is the only outreach channel (social platforms are for
-  knowledge-sharing, not ads). Trigger
+  cold email — a simple, capability-led pitch ("I'm a data scientist; if you're
+  struggling with a lot of data, I can help"), with the teardown used for internal
+  qualification, not embedded in the email. Cold email is the only outreach channel
+  (social platforms are for knowledge-sharing, not ads). Trigger
   on phrases like "find me some clients", "who should I email", "run a teardown on
   X", "draft a cold email to X", "build my prospect list",
   or any request to generate outreach for the data-analysis service. Covers any
@@ -20,17 +21,26 @@ description: >
 # Data Teardown & Outreach
 
 This skill runs the client-acquisition loop for a **solo data-analysis service**: find
-the right businesses, run a "teardown" on their *public* data for one credible finding,
-and draft a **product-led cold email** — pitch the service first, back it with that
-one-line finding, and point to a credibility website. The operator (Shubham) reviews
-every finding and sends every message by hand — this skill produces **drafts and
-analysis**, never auto-sends.
+the right businesses, run a "teardown" on their *public* data to qualify them, and draft a
+**simple, capability-led cold email** — say who you are (a data scientist), name where you
+can help across **both services** (data insights extraction **and** AI-agent automation),
+leave the door open to any data problem, and point to a credibility website. The
+teardown is for *internal qualification*, **not** embedded in the email — keep the message
+plain and human. The operator (Shubham) reviews every draft and sends every message by hand
+— this skill produces **drafts and analysis**, never auto-sends.
 
 ## The business this serves (context)
 
-The operator sells data-analysis-as-a-service: he takes a client's messy data (sales,
-orders, marketing, donations, etc.) and produces reports with genuine, revenue-driving
-insights. The go-to-market is **service-first**: land clients by doing a free sample
+The operator sells **two related services**:
+
+1. **Data insights extraction** — takes a client's messy data (sales, orders, marketing,
+   donations, etc.) and produces reports with genuine, revenue-driving insights.
+2. **AI agent automation** — builds AI agents to automate a client's repetitive or
+   manual tasks (data pulls, report generation, workflows, anything an agent can take
+   off their plate). Whenever the data pitch lands, offer this as a natural second thing
+   he can help with; some prospects need the automation more than the analysis.
+
+The go-to-market is **service-first**: land clients by doing a free sample
 analysis, charge per report or on retainer, and productize later. He has a low cost
 base (based in India), so clients paying a price that feels *cheap to them* is strong
 income for him — but sell **specialization, not cheapness**.
@@ -49,11 +59,13 @@ fast and high-quality — not to rebuild analysis tooling.
 ## What this skill does, end to end
 
 1. **Find & qualify prospects** — build a list of businesses that fit the target profile.
-2. **Run a teardown** — pull the prospect's *public* data and compute real findings
-   (deterministically, in code — see guardrails). You only need **one** for the email.
-3. **Draft outreach** — a **product-led cold email**: pitch the service first, back it
-   with one sentence of proof from the teardown, and point to the credibility website in
-   the signature. No pricing in the body — the ask is just "let's get in touch".
+2. **Run a teardown (for qualification, not for the email)** — pull the prospect's *public*
+   data to confirm they fit and to brief the operator. **Do not put the finding in the cold
+   email** — findings are for internal qualification and for the *reply*, not the first touch.
+3. **Draft outreach** — a **capability-led cold email**: state who you are (data scientist),
+   name where you can help (data wrangling, analysis, reports, insights), leave the door open
+   to any data problem, and point to the credibility website in the signature. No diagnosis of
+   their business, no pricing in the body — the ask is just "if it sounds like something you could use, happy to talk".
 4. **Hand off for review & send** — present drafts for the operator to sharpen and send.
 
 Do these in order when asked for the full loop, or jump to whichever step the operator
@@ -127,16 +139,53 @@ prospect's language and word of mouth travels fast inside it.
 decision-makers** at each prospect, not just one. Good roles: founder/CEO, but also the
 COO, head/VP of marketing or growth, head of ecommerce/operations, head of data/analytics,
 or whoever most owns the metric your finding speaks to (a growth finding → the growth
-lead; an ops finding → the COO). For each, get a **named human + their email**:
-- **LinkedIn** — find the people and their titles; note who owns which area.
-- **Company site** — About / Team / Leadership / Contact pages often list names and
-  sometimes direct emails.
-- **Email patterns** — if a company email format is visible (e.g. `first@domain`,
-  `first.last@domain`), infer the likely address for a named person, and verify with a
-  free checker where possible. Prefer a **named human over `info@`** every time.
+lead; an ops finding → the COO). For each, get a **named human + their title**, then run
+the email-discovery protocol below to find their actual address.
+
+### Email discovery — do this per prospect, in order (don't stop at guessing)
+
+Finding the *correct* address is worth real effort: a wrong guess bounces, wastes the
+send, and (in volume) hurts domain reputation. **Guessing from a pattern is the last
+resort, not the first move.** For every prospect, work these sources in order and stop as
+soon as you have a *published, verifiable* address for a named human:
+
+1. **The company website — read it properly, not just the homepage.** Fetch and actually
+   read: Contact, About, Team, Leadership, Meet-the-team, Careers, Press/Media, and the
+   **page footer** and **privacy policy / terms / imprint** (EU/UK sites are legally
+   required to publish a contact email in the imprint/legal notice). Many sites hide real
+   addresses in the footer or a "media enquiries" line rather than a contact form.
+2. **Targeted web search.** Run several queries, don't settle for one:
+   `"<Company>" contact email`, `"<Person name>" "<company.com>" email`,
+   `site:<company.com> email`, `"<Person>" <company> linkedin`, and
+   `"@<company.com>"` to surface the domain's real address format in the wild.
+3. **LinkedIn & socials.** Confirm the person still works there and owns the area; some
+   profiles or company "About"/contact sections list a direct or generic email.
+4. **Directory / data sources.** RocketReach, Hunter.io, Clearbit-style pages, Apollo,
+   ZoomInfo snippets, Crunchbase — these often surface the *verified pattern* and
+   sometimes the exact address, with a confidence score. Treat their guesses as
+   hypotheses, not facts.
+5. **Pattern inference — only as a fallback, and only if the format is actually observed.**
+   If (and only if) you have seen the domain's real format somewhere (e.g. a published
+   `jane.doe@acme.com`), infer a named person's likely address from that same pattern.
+   Never invent a format you haven't seen.
+
+**Verify before you send.** Run every candidate address through a free deliverability
+check (Hunter/NeverBounce/ZeroBounce free verifier, or an MX + SMTP catch-all check).
+Discard anything that fails or is a catch-all you can't confirm.
+
+**Record the source and confidence for each address** in the tracker: mark it
+`published` (found live on the site/a directory — highest trust), `verified` (passed a
+deliverability checker), or `inferred` (pattern-guessed — lowest trust, send last or not
+at all). **Prefer a published, named human over a guessed one, and both over `info@`.**
+If the only thing you can find is a generic `info@`/`hello@`, use it — a delivered generic
+beats a bounced guess.
+
 - Log **2–4 contacts per prospect** in the tracker so a single non-reply doesn't kill the
   lead — you can reach a second decision-maker. Don't blast the same email to all of them
   at once; space them, and tailor the finding to each person's area.
+- **Never send to an `inferred` address as the only recipient.** Pair it with a
+  `published`/`verified` address, or verify it first — this is exactly the failure that
+  causes bounces.
 
 ---
 
@@ -185,28 +234,46 @@ findings.
 
 ### Cold email
 
-**Product-led, ≤4 sentences, two short paragraphs.** The motion is **service pitch first,
-one-line proof second**, with a credibility website in the signature doing the real
-convincing (blogs/Medium/Twitter/LinkedIn all point back to it). No methodology paragraph,
-no credential dump, no pricing in the body. Structure:
-1. **Paragraph 1 — the service pitch.** "I saw you run [Brand] — extracting insight as an
-   ecommerce brand grows is hard, expensive, time-consuming. **I provide a service** that
-   uses AI agents to do exactly that." Say *provide a service*, never "built a product".
-2. **Paragraph 2 — one-line proof + soft ask.** "From the public data available about your
-   [store/site], I found [ONE-SENTENCE finding, tied to money or a decision]. If you think
-   it's worth your time to see how I can help you, let's get in touch." The finding is a
-   *single sentence* — enough to prove you looked, not a teardown.
-3. **Signature**: clickable-name link + website — and **only** the website. The signature
-   must contain `shubhamrandive.com` and no other link (no LinkedIn, Calendly, Medium,
-   Twitter, email URLs, etc.):
-   `[Shubham Randive](https://shubhamrandive.com) · shubhamrandive.com`. The site is live,
-   so link the name to it; every other profile is reachable from the site.
+**Capability-led, warm, phone-readable, and adapted to the company.** The motion is
+**observation → time-framed offer → concrete capability → website-as-proof → question close**.
+A credibility website (mid-body) does the real convincing. **Do NOT diagnose their business or
+embed a teardown finding** — earlier "clever" drafts that critiqued the prospect's setup were
+too complicated, presumptuous, and often wrong. Keep it simple; they may have a different data
+problem than you'd guess.
 
-**Do NOT** put pricing or the sample-then-paid model in the body — the ask is just "let's
-get in touch"; the service/pricing come out on the call or the website. Match the promised
-depth to the prospect's tier (from Step 1) only once you're talking, not in the cold email.
-Keep the subject plain + benefit-led (e.g., "Getting real insight out of your store's
-data"), not a naked finding.
+**Adapt every email to the specific company — it is not a fixed form-letter.** The skeleton is
+constant, but three things are rewritten per prospect from what you learned qualifying them:
+- **The observation** — their actual channels/model ("an independent roastery selling direct",
+  "SEO and Google Ads for a roster of clients", "an Ayurvedic skincare brand with a broad range").
+- **The data you name** — match their vertical: ecommerce → *sales and customer data*; a
+  nonprofit → *donation and program data*; a SaaS → *usage and subscription data*; an agency →
+  *campaign and client data*. Never say the generic "your data" when you can name theirs.
+- **The subject and the payoff** — the benefit that matters to *this* business (growth,
+  retention, fundraising efficiency, etc.).
+
+Structure:
+1. **Observation + time-framed offer (this goes FIRST).** Open with **one light observation**
+   you could only know by looking at their site — kept light, not too specific
+   (e.g. "You run an independent roastery selling direct—which means your business generates a
+   lot of data"). It's an *observation, never a diagnosis*. Then frame the pain around **their
+   time**: "If pulling that information together and finding clear, actionable insights from it
+   takes up too much of your time, I can help." One clean pain, not a laundry list.
+2. **Who you are + concrete, outcome-led capability.** "I'm a data scientist, and I build AI
+   tools that look at [their data, e.g. sales and customer data] to highlight the trends that
+   actually matter for your growth." Name *their* data and the *payoff*, not abstract "insights".
+   Then name the **second service in one line**: "I also build AI agents that automate the
+   manual, repetitive work that eats your time." Two services, both stated — data insights
+   **and** AI-agent automation. Keep it to one line so the email stays tight.
+3. **Website as proof (in-body).** "My website (shubhamrandive.com) showcases how I do this."
+4. **Question close.** "Open to a quick chat about how to get more value out of your [store's/
+   business's] data?" — a question invites a reply better than "happy to talk".
+5. **Warm sign-off.** "Best, Shubham." The only link anywhere is `shubhamrandive.com` (no
+   LinkedIn, Calendly, Medium, Twitter, email URLs) — every other profile is reachable from it.
+
+**Do NOT** put pricing or the sample-then-paid model in the body. The teardown/tier is internal
+qualification only — don't reference it in the cold email; save specifics for the reply. Use a
+**benefit subject** (e.g. "Making sense of your store's data"), and **vary it across a batch**
+so identical subjects don't read as mass-mail.
 
 See `references/outreach-templates.md` for the ready template and the reusable principles.
 

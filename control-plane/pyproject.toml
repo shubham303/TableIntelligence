@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tabint-control"
+version = "0.1.0"
+description = "Table Intelligence control plane — layered (repository/service/endpoint), DuckDB (local) / Postgres-Neon (prod)."
+requires-python = ">=3.10"
+authors = [{ name = "Shubham Randive" }]
+# Private backend package — never published.
+classifiers = ["Private :: Do Not Upload"]
+dependencies = ["duckdb"]
+
+[project.optional-dependencies]
+postgres = ["psycopg[binary]"]
+dev = ["pytest"]
+
+[project.scripts]
+tabint-control = "tabint_control.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tabint_control*"]

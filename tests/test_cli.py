@@ -4,7 +4,7 @@ import shutil
 
 import pytest
 
-from tabular.cli import main
+from tabint.cli import main
 
 
 def _run(capsys, argv) -> tuple[int, object]:

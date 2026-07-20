@@ -6,9 +6,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from tabular import persistence
-from tabular._serialize import jsonable
-from tabular.cli import main
+from tabint import persistence
+from tabint._serialize import jsonable
+from tabint.cli import main
 
 
 def _csv(tmp_path, name, df):
@@ -55,7 +55,7 @@ def test_cli_sql_infinity_is_valid_json(tmp_path, capsys):
 
 def test_corrupt_meta_survives(tmp_path):
     s = persistence.create_session([_csv(tmp_path, "d.csv",
-                                    pd.DataFrame({"x": range(20), "y": [0, 1] * 10}))], base=tmp_path)
+                                    pd.DataFrame({"x": range(40), "y": [0, 1] * 20}))], base=tmp_path)
     (persistence.session_dir(s.id, base=tmp_path) / "meta.json").write_text("{ this is corrupt")
     # a subsequent train + save_model must still succeed despite the bad meta
     model = s.table("d").train_classifier("y", name="m")
@@ -103,5 +103,5 @@ def test_cli_explain_prediction(tmp_path, capsys):
 
 
 def test_mcp_exposes_explain_prediction():
-    from tabular import mcp_server as M
+    from tabint import mcp_server as M
     assert hasattr(M, "explain_prediction")

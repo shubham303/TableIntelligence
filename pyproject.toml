@@ -3,10 +3,27 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "tabular"  # PLACEHOLDER — rename before any public release
-version = "0.0.0"
+name = "tabint"
+version = "0.1.0"
 description = "A deterministic, reproducible intelligence layer for single-table data."
 requires-python = ">=3.10"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Shubham Randive" }]
+keywords = [
+    "mcp", "model-context-protocol", "data-analysis", "analytics", "statistics",
+    "machine-learning", "rfm", "forecasting", "causal-inference", "duckdb",
+    "table-intelligence", "local-first",
+]
+# Private, proprietary package — NOT for public PyPI. The "Private :: Do Not
+# Upload" classifier makes PyPI reject an accidental `twine upload`.
+classifiers = [
+    "Private :: Do Not Upload",
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
 dependencies = [
     "ibis-framework[duckdb]",
     "pandas",
@@ -38,9 +55,16 @@ tabicl = ["tabicl>=0.1"]
 # (explain_metric, rfm, retention_cohorts, compare_periods use core deps only.)
 insights = ["mlxtend", "dowhy", "ruptures"]
 
+[project.urls]
+Homepage = "https://github.com/shubham303/TableIntelligence"
+Repository = "https://github.com/shubham303/TableIntelligence"
+
 [project.scripts]
-tabular = "tabular.cli:main"
-tabular-mcp = "tabular.mcp_server:main"
+tabint = "tabint.cli:main"
+tabint-mcp = "tabint.mcp_server:main"
+# Branded aliases (product name: Table Intelligence). Same entry points.
+table-intelligence = "tabint.cli:main"
+table-intelligence-mcp = "tabint.mcp_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -3,7 +3,7 @@ import shutil
 
 import pytest
 
-from tabular import Session
+from tabint import Session
 
 _LINKED = ["orders.csv", "customers.csv", "products.csv"]
 
@@ -175,7 +175,7 @@ def test_create_table_requires_exactly_one_mode(linked):
 # --------------------------------------------------------------------------- #
 
 def test_derived_columns_excluded_from_features(linked):
-    from tabular.analytics import _prep
+    from tabint.analytics import _prep
 
     orders = linked.table("orders")
     before_num, before_cat = _prep.feature_columns(orders)
@@ -191,7 +191,7 @@ def test_derived_columns_excluded_from_features(linked):
 
 
 def test_write_back_feature_true_stays_a_feature(linked):
-    from tabular.analytics import _prep
+    from tabint.analytics import _prep
 
     orders = linked.table("orders")
     n = len(orders.get_frame())
@@ -202,8 +202,8 @@ def test_write_back_feature_true_stays_a_feature(linked):
 
 
 def test_derived_registry_survives_reopen(tmp_path):
-    from tabular.analytics import _prep
-    from tabular.workspace import Workspace
+    from tabint.analytics import _prep
+    from tabint.workspace import Workspace
 
     db = str(tmp_path / "ws.duckdb")
     src = tmp_path / "orders.csv"
