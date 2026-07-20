@@ -115,18 +115,3 @@ def update_prospect(prospect_id: str, fields: dict) -> dict:
 
 def delete_prospect(prospect_id: str) -> dict:
     return _request("DELETE", f"/api/outreach/prospects/{prospect_id}")
-
-
-def send_prospect(prospect_id: str) -> dict:
-    return _request("POST", f"/api/outreach/prospects/{prospect_id}/send", {})
-
-
-def get_email_account() -> dict:
-    return _request("GET", "/api/outreach/email-account")
-
-
-def connect_email_account(api_key: str, from_email: str, from_name: str | None = None,
-                          provider: str = "resend") -> dict:
-    return _request("PUT", "/api/outreach/email-account",
-                    {"api_key": api_key, "from_email": from_email,
-                     "from_name": from_name, "provider": provider})

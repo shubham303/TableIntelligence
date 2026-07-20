@@ -187,9 +187,12 @@ def list_folders() -> dict:
 
 
 # --------------------------------------------------------------------------- #
-# outreach connector — manage prompts, prospects, and send email via the
-# platform (data lives on the user's Table Intelligence account; sending uses
-# their own connected email provider). A paid connector: needs trial/premium.
+# outreach connector — manage prompts and prospect data (research + drafted
+# email) on the user's Table Intelligence account. This is a data/CRUD surface
+# only: it does NOT send email. To actually send, use your own email tool
+# (e.g. a Gmail/SMTP MCP), then record the outcome here with
+# outreach_update_prospect (set status to 'sent'/'replied', save reply_text).
+# A paid connector: needs trial/premium.
 # --------------------------------------------------------------------------- #
 
 _NEED_KEY_OUTREACH = {
@@ -262,19 +265,6 @@ def outreach_update_prospect(prospect_id: str, fields: dict) -> dict:
     return _platform.update_prospect(prospect_id, fields) if _platform.configured() else _NEED_KEY_OUTREACH
 
 
-@mcp.tool()
-@entitlement.requires_paid
-def outreach_send(prospect_id: str) -> dict:
-    """Send a prospect's drafted email via the user's connected email account.
-    Fails cleanly if no account is connected or the draft is incomplete."""
-    return _platform.send_prospect(prospect_id) if _platform.configured() else _NEED_KEY_OUTREACH
-
-
-@mcp.tool()
-@entitlement.requires_paid
-def outreach_email_account() -> dict:
-    """Show whether a sending email account is connected (never returns the key)."""
-    return _platform.get_email_account() if _platform.configured() else _NEED_KEY_OUTREACH
 
 
 @mcp.tool()
