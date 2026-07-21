@@ -20,3 +20,7 @@ temp.txt
 *.env
 control-plane/.env
 .claude-artifacts/
+
+# ZCode: track workspace skills, ignore session artifacts
+.zcode/plans/
+.zcode/sessions/
