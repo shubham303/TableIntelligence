@@ -125,6 +125,17 @@ def add_email(campaign_id: str, recipients, subject: str, body: str,
 def list_emails(campaign_id: str, status: str | None = None) -> dict:
     return _request("GET", "/api/outreach/emails" + _qs({"campaign_id": campaign_id, "status": status}))
 
+
+def ready_emails(campaign_id: str) -> dict:
+    """Emails in a campaign that still need sending — every email whose status is
+    not 'sent' (i.e. 'draft' or 'failed'). Filters client-side on top of
+    list_emails; the API's status values are 'draft' | 'sent' | 'failed'."""
+    res = list_emails(campaign_id)
+    if isinstance(res, dict) and isinstance(res.get("emails"), list):
+        res = dict(res)
+        res["emails"] = [e for e in res["emails"] if e.get("status") != "sent"]
+    return res
+
 def get_email(email_id: str) -> dict:
     return _request("GET", f"/api/outreach/emails/{email_id}")
 
