@@ -2,10 +2,10 @@
 
 A deterministic, reproducible intelligence layer for **single-table** data.
 
-`tabular` is a Python library of statistical and machine-learning operations for
+`tabint` is a Python library of statistical and machine-learning operations for
 one table at a time. Each operation is a plain, directly-callable function with a
-**structured, inspectable result** — and (in the future) an optional agent that
-orchestrates these same functions from a natural-language question.
+**structured, inspectable result** — plus an **MCP server** that exposes the same
+deterministic functions to any MCP-capable agent (Claude Cowork, Codex, Cursor).
 
 The design goal that sets it apart: **the same question yields the same, correct
 answer every time, with the method it chose made explicit.** Code-generation tools
@@ -13,21 +13,38 @@ that write fresh pandas on every run can't promise that; this library is built s
 the computation is deterministic and the statistical method is selected by
 transparent rules, not improvised.
 
-> **Status: V0 — skeleton only.** The structure and docs exist; algorithms are
-> being added one at a time. See the roadmap below for what's implemented.
+> **Status: working library + MCP server.** Phases 0–8 of the roadmap are
+> implemented and tested (225 tests passing); see the roadmap below.
 
-## Install (development)
+## Install
+
+The package is **private** (not on PyPI — see `pyproject.toml`'s
+`Private :: Do Not Upload` classifier), so install from source. Requires
+Python ≥ 3.10.
 
 ```bash
-pip install -e .
+git clone https://github.com/shubham303/TableIntelligence.git
+cd TableIntelligence
+pip install -e ".[mcp]"   # library + `tabint` CLI + `tabint-mcp` server
 ```
+
+Verify it landed:
+
+```bash
+tabint --help        # the CLI
+tabint-mcp --help    # the MCP server (stdio transport)
+```
+
+> **Not publishing to PyPI on purpose.** `uvx tabint-mcp` / `pipx run tabint-mcp`
+> won't work until the `Private :: Do Not Upload` classifier is removed and the
+> package is published. Use the clone-and-install flow above.
 
 ## Intended usage
 
 Single table — the flat convenience API:
 
 ```python
-from tabular import Session
+from tabint import Session
 
 s = Session.load("customers.csv")
 s.profile()                                   # describe every column
@@ -57,21 +74,97 @@ into a single table the rest of the library can reason about.
 
 ## Use it from an AI agent (CLI + MCP)
 
-The core is exposed to external agents (Claude Code, Claude Cowork) through a
-terminal **CLI** and an **MCP server**, both driven by a persistent *session key*:
+The core is exposed to any MCP-capable agent through a terminal **CLI**
+(`tabint`) and an **MCP server** (`tabint-mcp`), both driven by a persistent
+*session key*. First do the install above, then register the server with your
+agent.
+
+### Environment variables
+
+All agents need these in the server's `env`. Set them once and reuse the block
+in every config below.
+
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `TABINT_API_KEY` | **yes** | — | Your key from `https://shubhamrandive.com/dashboard/account`. Absent → free tier (all analytics still work; paid connectors/reports/outreach are gated). |
+| `TABINT_CONTROL_PLANE_URL` | no | `https://shubhamrandive.com` | Base URL of the control plane (reports, folders, key validation). |
+| `TABULAR_BASE` | no | current dir | Where on-disk sessions are stored (`<base>/.tableint/sessions/`). |
+
+### Claude Code / Claude Cowork / Claude Desktop
+
+Register the server (Claude Code CLI):
 
 ```bash
-pip install -e ".[mcp]"                 # library + `tabular` CLI + `tabular-mcp` server
-claude mcp add tabular -- tabular-mcp   # register with Claude Code
+claude mcp add tabint \
+  --env TABINT_API_KEY=sk_your_key_here \
+  --env TABINT_CONTROL_PLANE_URL=https://shubhamrandive.com \
+  -- tabint-mcp
 ```
+
+…or paste the JSON block into the MCP config (Cowork / Desktop):
+
+```json
+{
+  "mcpServers": {
+    "tabint": {
+      "command": "tabint-mcp",
+      "env": {
+        "TABINT_API_KEY": "sk_your_key_here",
+        "TABINT_CONTROL_PLANE_URL": "https://shubhamrandive.com"
+      }
+    }
+  }
+}
+```
+
+### OpenAI Codex (CLI)
+
+Add to `~/.codex/config.toml` (Codex reads MCP servers from `[mcp_servers.*]`):
+
+```toml
+[mcp_servers.tabint]
+command = "tabint-mcp"
+args = []
+env = { TABINT_API_KEY = "sk_your_key_here", TABINT_CONTROL_PLANE_URL = "https://shubhamrandive.com" }
+```
+
+### Cursor
+
+Add to `.cursor/mcp.json` in your project (or *Settings → MCP* for global):
+
+```json
+{
+  "mcpServers": {
+    "tabint": {
+      "command": "tabint-mcp",
+      "env": {
+        "TABINT_API_KEY": "sk_your_key_here",
+        "TABINT_CONTROL_PLANE_URL": "https://shubhamrandive.com"
+      }
+    }
+  }
+}
+```
+
+### Verify it works
+
+After registering the server in any agent, ask it to call the `account_status`
+tool — it should return your tier:
+
+```text
+> call account_status
+{"tier": "paid", "entitled": true, ...}   # or "free" if no key set
+```
+
+Or from the CLI directly:
 
 ```bash
-tabular load orders.csv customers.csv   # -> {"session_key": "s_ab12", "tables": [...], "relationships": [...]}
-tabular associate order_total tier --session s_ab12 --table orders
+tabint load orders.csv customers.csv   # -> {"session_key": "s_ab12", "tables": [...], "relationships": [...]}
+tabint associate order_total tier --session s_ab12 --table orders
 ```
 
-See [`docs/agent-integration.md`](docs/agent-integration.md) for the full tool list
-and Claude Code / Cowork setup. This replaces the originally-planned bespoke agent
+See [`docs/agent-integration.md`](docs/agent-integration.md) for the full tool
+list and troubleshooting. This replaces the originally-planned bespoke agent
 harness: any MCP-capable agent orchestrates the same deterministic functions.
 
 ## Documentation
@@ -156,4 +249,8 @@ complex multi-way transforms) remains upstream of where these algorithms begin.
 
 ## License
 
-Not yet chosen — see `docs/roadmap.md`. Do not assume any license until one is added.
+**Not yet finalized.** The `LICENSE` file is currently a placeholder (`TODO: choose
+a license before any public release`), and the package carries the
+`Private :: Do Not Upload` PyPI classifier — so this is **proprietary / all rights
+reserved** until a license is chosen. Do not assume any open-source license applies
+until one is added. See `docs/roadmap.md`.
