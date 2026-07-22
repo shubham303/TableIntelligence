@@ -5,7 +5,6 @@ import pandas as pd
 import pytest
 
 from tabint import mcp_server
-from tabint import entitlement
 from tabint.connectors import contract, get_connector
 from tabint.connectors import stripe as stripe_conn
 
@@ -99,16 +98,10 @@ def test_list_respects_limit(monkeypatch):
     assert len(stripe_conn._list("charges", "k", 2)) == 2
 
 
-# ── Pro gating ──────────────────────────────────────────────────────────────
-def test_connect_stripe_blocked_when_not_pro(monkeypatch):
-    monkeypatch.setattr(entitlement, "is_pro", lambda: False)
-    monkeypatch.setattr(entitlement, "role", lambda force=False: "free")
-    out = mcp_server.connect_stripe()
-    assert out["error"] == "pro_feature"
-
-
-def test_connect_stripe_needs_key_when_pro(monkeypatch):
-    monkeypatch.setattr(entitlement, "is_pro", lambda: True)
+# ── no role gating; only the Stripe-credential check ────────────────────────
+def test_connect_stripe_needs_credentials(monkeypatch):
+    # The MCP no longer role-gates connect_stripe; without a Stripe key it
+    # surfaces no_credentials (the provider→machine fetch needs a key).
     monkeypatch.delenv("STRIPE_API_KEY", raising=False)
     monkeypatch.delenv("TABINT_STRIPE_KEY", raising=False)
     out = mcp_server.connect_stripe()
@@ -116,7 +109,6 @@ def test_connect_stripe_needs_key_when_pro(monkeypatch):
 
 
 def test_connect_stripe_creates_session(monkeypatch, tmp_path, mocked_stripe):
-    monkeypatch.setattr(entitlement, "is_pro", lambda: True)
     monkeypatch.setattr(mcp_server, "_BASE", str(tmp_path))
     monkeypatch.setenv("STRIPE_API_KEY", "sk_test_x")
     out = mcp_server.connect_stripe(limit=100)

@@ -1,4 +1,8 @@
-"""Tests for the entitlement/gating layer — fail-open, caching, Pro gating."""
+"""Tests for the entitlement/role lookup — fail-open, caching, role resolution.
+
+The MCP server no longer does client-side gating (no ``requires_pro``); these
+tests cover the informational role lookup that ``account_status`` relies on.
+"""
 from __future__ import annotations
 
 import json
@@ -83,28 +87,19 @@ def test_cache_avoids_repeat_calls(monkeypatch):
     assert calls["n"] == 1
 
 
-def test_requires_pro_blocks_when_free(monkeypatch):
-    monkeypatch.setattr(entitlement, "is_pro", lambda: False)
+def test_status_reports_role_and_note(monkeypatch):
+    """status() feeds account_status: it reports the role and a human note,
+    regardless of tier (there is no client-side gating to assert on)."""
     monkeypatch.setattr(entitlement, "role", lambda force=False: "free")
+    s = entitlement.status()
+    assert s["role"] == "free"
+    assert s["pro_features_unlocked"] is False
+    assert "shubhamrandive.com" in s["note"]
 
-    @entitlement.requires_pro
-    def fetch_shopify():
-        return {"ok": True, "rows": 10}
-
-    out = fetch_shopify()
-    assert out["ok"] is False
-    assert out["error"] == "pro_feature"
-    assert "shubhamrandive.com" in out["message"]
-
-
-def test_requires_pro_runs_when_entitled(monkeypatch):
-    monkeypatch.setattr(entitlement, "is_pro", lambda: True)
-
-    @entitlement.requires_pro
-    def fetch_shopify():
-        return {"ok": True, "rows": 10}
-
-    assert fetch_shopify() == {"ok": True, "rows": 10}
+    monkeypatch.setattr(entitlement, "role", lambda force=False: "pro")
+    s = entitlement.status()
+    assert s["role"] == "pro"
+    assert s["pro_features_unlocked"] is True
 
 
 def test_validate_remote_parses_role(monkeypatch):

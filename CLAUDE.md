@@ -59,8 +59,9 @@ User's machine                              Cloud (shubham-site)
   the user explicitly saves.
 - All persisted data goes through the platform APIs — the MCP server never talks to a database
   directly.
-- Analytics tools are free; connectors (outreach, etc.) and cloud storage are the Pro tier, gated
-  server-side on the API by subscription and mirrored client-side by `entitlement.requires_pro`.
+- Analytics tools are free; the whole MCP server is free to use with no client-side gating.
+  The Pro tier (persisting outreach/reports to the dashboard) is enforced server-side on the
+  API by subscription only. The `entitlement` module is informational (feeds `account_status`).
 - **Auth/entitlement model**: two roles — `free` and `pro`. The MCP sends the user's API key in the
   `x-api-key` header on every platform call and validates it via `POST /api/validate-key`, which
   returns `{ role, trial_until }`. Roles are derived server-side from the
