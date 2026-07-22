@@ -34,7 +34,9 @@ jobs:
         run: uv python install 3.12
 
       - name: Run tests
-        run: uv run --extra dev pytest -q
+        # The suite touches features from the [insights] extra (ruptures,
+        # mlxtend) — install it alongside dev so CI matches a full local run.
+        run: uv run --extra dev --extra insights pytest -q
 
       - name: Build distribution
         run: uv build
