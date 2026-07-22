@@ -31,7 +31,6 @@ import os
 import time
 import urllib.error
 import urllib.request
-from pathlib import Path
 
 FREE = "free"
 PRO = "pro"
@@ -45,25 +44,6 @@ _TIMEOUT = 6  # network timeout (s); short so startup never hangs
 _cache: tuple[str, float] | None = None
 
 
-def _device_id() -> str:
-    """Stable per-machine id, persisted at ~/.tabint/device (created once).
-
-    Sent to the control plane for analytics/logging. Raw data is never sent —
-    only the API key (in the x-api-key header) and this device id.
-    """
-    path = Path.home() / ".tabint" / "device"
-    try:
-        if path.exists():
-            return path.read_text(encoding="utf-8").strip()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        did = f"dev_{os.urandom(8).hex()}"
-        path.write_text(did, encoding="utf-8")
-        return did
-    except OSError:
-        # Non-persistable environment: fall back to a per-process id. Never blocks.
-        return "ephemeral-" + os.urandom(8).hex()
-
-
 def _control_plane_url() -> str:
     return (os.environ.get("TABINT_CONTROL_PLANE_URL") or _DEFAULT_CONTROL_PLANE).rstrip("/")
 
@@ -74,7 +54,7 @@ def _validate_remote(api_key: str) -> str:
     Raises on any failure so the caller can fail open.
     """
     url = f"{_control_plane_url()}/api/validate-key"
-    payload = json.dumps({"api_key": api_key, "device_id": _device_id()}).encode("utf-8")
+    payload = json.dumps({"api_key": api_key}).encode("utf-8")
     req = urllib.request.Request(
         url,
         data=payload,
@@ -122,7 +102,6 @@ def status() -> dict:
     return {
         "role": r,
         "pro_features_unlocked": r == PRO,
-        "device_id": _device_id(),
         "control_plane": _control_plane_url(),
         "note": (
             "All analytics tools are free. Connectors and cloud artifact storage "

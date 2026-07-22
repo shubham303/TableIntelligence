@@ -59,7 +59,7 @@ Register via the Claude Code CLI:
 
 ```bash
 claude mcp add tabint \
-  --env TABINT_API_KEY=sk_your_key_here \
+  --env TABINT_API_KEY=ti_your_key_here \
   --env TABINT_CONTROL_PLANE_URL=https://shubhamrandive.com \
   -- tabint-mcp
 ```
@@ -72,7 +72,7 @@ claude mcp add tabint \
     "tabint": {
       "command": "tabint-mcp",
       "env": {
-        "TABINT_API_KEY": "sk_your_key_here",
+        "TABINT_API_KEY": "ti_your_key_here",
         "TABINT_CONTROL_PLANE_URL": "https://shubhamrandive.com"
       }
     }
@@ -89,7 +89,7 @@ Codex reads MCP servers from `[mcp_servers.*]` in `~/.codex/config.toml`
 [mcp_servers.tabint]
 command = "tabint-mcp"
 args = []
-env = { TABINT_API_KEY = "sk_your_key_here", TABINT_CONTROL_PLANE_URL = "https://shubhamrandive.com" }
+env = { TABINT_API_KEY = "ti_your_key_here", TABINT_CONTROL_PLANE_URL = "https://shubhamrandive.com" }
 ```
 
 ### Cursor
@@ -103,7 +103,7 @@ global install):
     "tabint": {
       "command": "tabint-mcp",
       "env": {
-        "TABINT_API_KEY": "sk_your_key_here",
+        "TABINT_API_KEY": "ti_your_key_here",
         "TABINT_CONTROL_PLANE_URL": "https://shubhamrandive.com"
       }
     }
@@ -114,11 +114,11 @@ global install):
 ## Verify it works
 
 After registering, ask the agent to call the `account_status` tool. With a valid
-key it returns your tier; with no key it reports `free` (analytics still work):
+key it returns your role; with no key it reports `free` (analytics still work):
 
 ```text
 > call account_status
-{"tier": "paid", "entitled": true, ...}
+{"role": "pro", "pro_features_unlocked": true, ...}
 ```
 
 To pin a session-store location, set `TABULAR_BASE` too — e.g.

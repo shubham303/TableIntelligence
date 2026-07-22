@@ -48,9 +48,10 @@ User's machine                              Cloud (shubham-site)
 - **`TableIntelligence`** (this repo) — the MCP server. Python package `tabint` (src layout). The
   analytics engine + the outreach connector tools. The MCP holds no DB; `src/tabint/platform.py` is
   its HTTP client to the platform APIs.
-- **`shubham-site`** (sibling, `../shubham-site`) — the web platform: Astro SSR on Vercel, Supabase
-  Postgres via `DATABASE_URL`, `src/server/{db,repositories,services,lib}` + `src/pages/api/*` +
-  the `/dashboard` UI. See `shubham-site/SUPABASE.md` for the database setup.
+- **`shubham-site`** (sibling, `../shubham-site`) — the web platform: Astro SSR on Vercel, **Neon
+  Postgres** via `DATABASE_URL`. Backend is feature-sliced under `src/server/features/<feature>/`
+  (model → repository → service); auth + billing are owned by BetterAuth + better-auth-razorpay.
+  See `shubham-site/NEON.md` for the database setup.
 
 ## Conventions
 
