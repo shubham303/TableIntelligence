@@ -41,9 +41,13 @@ Fast-lane `train_classifier` / `train_regressor` → `TrainedModel.predict` →
   database-to-recommendations vision.
 
 ## Deferred decisions (revisit deliberately, not now)
-- **License** — pick before any public release. Permissive (MIT/Apache) maximizes
-  adoption and embedding; consider a separate license for any future hosted piece.
 - **Monetization** — keep the deterministic-correctness/reproducibility layer
   cleanly separable, since that's both the present differentiator and the most
   natural future paid surface. No action needed yet beyond keeping it liftable.
-- **Naming** — `tabular` is a placeholder; choose and rename before publishing.
+
+## Resolved decisions
+- **License** — Apache-2.0. The distributed package (library, CLI, MCP server) is
+  fully open; monetization lives in the hosted control plane (Pro role,
+  connectors, reports), not the client.
+- **Naming** — `tabint` (PyPI package + import name). Published on PyPI;
+  installable via `uvx tabint-mcp` with no local env setup.

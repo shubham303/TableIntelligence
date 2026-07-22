@@ -13,14 +13,14 @@ across separate calls or a server restart.
 
 ## Install
 
-The package is **private** (not on PyPI — it carries the
-`Private :: Do Not Upload` classifier), so install from source. Requires
-Python ≥ 3.10.
+The package is on PyPI. Requires Python ≥ 3.10.
 
 ```bash
-git clone https://github.com/shubham303/TableIntelligence.git
-cd TableIntelligence
-pip install -e ".[mcp]"     # library + `tabint` CLI + `tabint-mcp` server
+# MCP server — no install needed, runs isolated via uvx
+uvx tabint-mcp --help
+
+# or install the CLI + MCP server into your environment
+pip install tabint
 ```
 
 This installs four console scripts (two branded aliases):

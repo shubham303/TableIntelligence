@@ -18,14 +18,14 @@ transparent rules, not improvised.
 
 ## Install
 
-The package is **private** (not on PyPI — see `pyproject.toml`'s
-`Private :: Do Not Upload` classifier), so install from source. Requires
-Python ≥ 3.10.
+The package is on PyPI. Requires Python ≥ 3.10.
 
 ```bash
-git clone https://github.com/shubham303/TableIntelligence.git
-cd TableIntelligence
-pip install -e ".[mcp]"   # library + `tabint` CLI + `tabint-mcp` server
+# MCP server — no install needed, runs isolated via uvx
+uvx tabint-mcp --help
+
+# or install the CLI + MCP server into your environment
+pip install tabint
 ```
 
 Verify it landed:
@@ -35,9 +35,8 @@ tabint --help        # the CLI
 tabint-mcp --help    # the MCP server (stdio transport)
 ```
 
-> **Not publishing to PyPI on purpose.** `uvx tabint-mcp` / `pipx run tabint-mcp`
-> won't work until the `Private :: Do Not Upload` classifier is removed and the
-> package is published. Use the clone-and-install flow above.
+> No `uvx`? Install it with `curl -LsSf https://astral.sh/uv/install.sh | sh`,
+> or use `pipx run tabint-mcp --help` instead.
 
 ## Intended usage
 
@@ -98,7 +97,7 @@ Register the server (Claude Code CLI):
 claude mcp add tabint \
   --env TABINT_API_KEY=ti_your_key_here \
   --env TABINT_CONTROL_PLANE_URL=https://shubhamrandive.com \
-  -- tabint-mcp
+  -- uvx tabint-mcp
 ```
 
 …or paste the JSON block into the MCP config (Cowork / Desktop):
@@ -107,7 +106,8 @@ claude mcp add tabint \
 {
   "mcpServers": {
     "tabint": {
-      "command": "tabint-mcp",
+      "command": "uvx",
+      "args": ["tabint-mcp"],
       "env": {
         "TABINT_API_KEY": "ti_your_key_here",
         "TABINT_CONTROL_PLANE_URL": "https://shubhamrandive.com"
@@ -123,8 +123,8 @@ Add to `~/.codex/config.toml` (Codex reads MCP servers from `[mcp_servers.*]`):
 
 ```toml
 [mcp_servers.tabint]
-command = "tabint-mcp"
-args = []
+command = "uvx"
+args = ["tabint-mcp"]
 env = { TABINT_API_KEY = "ti_your_key_here", TABINT_CONTROL_PLANE_URL = "https://shubhamrandive.com" }
 ```
 
@@ -136,7 +136,8 @@ Add to `.cursor/mcp.json` in your project (or *Settings → MCP* for global):
 {
   "mcpServers": {
     "tabint": {
-      "command": "tabint-mcp",
+      "command": "uvx",
+      "args": ["tabint-mcp"],
       "env": {
         "TABINT_API_KEY": "ti_your_key_here",
         "TABINT_CONTROL_PLANE_URL": "https://shubhamrandive.com"
@@ -249,8 +250,7 @@ complex multi-way transforms) remains upstream of where these algorithms begin.
 
 ## License
 
-**Not yet finalized.** The `LICENSE` file is currently a placeholder (`TODO: choose
-a license before any public release`), and the package carries the
-`Private :: Do Not Upload` PyPI classifier — so this is **proprietary / all rights
-reserved** until a license is chosen. Do not assume any open-source license applies
-until one is added. See `docs/roadmap.md`.
+Apache License 2.0 — see [`LICENSE`](LICENSE). The distributed package (library,
+CLI, and MCP server) is fully open source. Monetization lives entirely in the
+hosted control plane (connectors, reports, outreach, and the Pro role), not in
+the client software.
