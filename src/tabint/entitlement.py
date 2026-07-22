@@ -1,22 +1,28 @@
-"""Entitlement / subscription gating for the Table Intelligence MCP server.
+"""Entitlement / role gating for the Table Intelligence MCP server.
 
-Local-first pricing model: all analytics tools are free forever; connectors and
-cloud artifact storage are paid. This module answers one question — *is this
-install entitled to paid features?* — by validating an API key against the
-control plane (Supabase Edge Function ``validate-key``).
+Local-first pricing model: all analytics tools are free forever; connectors
+and cloud artifact storage are Pro. This module answers one question — *is
+this install entitled to Pro features?* — by validating the user's API key
+against the control plane (the shubham-site platform).
+
+Two roles: ``free`` and ``pro``. The platform derives the role from the
+better-auth-razorpay subscription table (active or within-trial => pro).
 
 Design rules:
-  * **Fails open to the free tier.** Any network/config error → ``free``. The
+  * **Fails open to the free role.** Any network/config error => ``free``. The
     server must never crash or block core analytics because auth was unreachable.
   * **Stdlib only** (``urllib``) — no new runtime dependency.
   * **Cached** with a periodic re-check so we don't hit the network per call.
-  * **Device-bound.** A stable per-machine id is sent so the control plane can
-    enforce the 2-device cap. Raw data is never sent — only key + device id.
 
 Env:
-  ``TABINT_API_KEY``            the user's key (absent → free tier)
+  ``TABINT_API_KEY``            the user's key (absent => free role)
   ``TABINT_CONTROL_PLANE_URL``  base URL of the control plane
-                                (default: https://api.shubhamrandive.com)
+                                (default: https://shubhamrandive.com)
+
+Wire contract with the platform (POST /api/validate-key):
+  request:  {"api_key": "ti_..."}            # key in the body, OR
+            header  x-api-key: ti_...        # the same key in the header
+  response: {"role": "free" | "pro", "trial_until": "<iso>" | null}
 """
 from __future__ import annotations
 
@@ -25,39 +31,17 @@ import os
 import time
 import urllib.error
 import urllib.request
-import uuid
-from pathlib import Path
 
 FREE = "free"
-TRIAL = "trial"
-PAID = "paid"
-EXPIRED = "expired"
-
-# Tiers that unlock paid features (connectors, artifact storage).
-_ENTITLED = {TRIAL, PAID}
+PRO = "pro"
+_ROLES = {FREE, PRO}
 
 _DEFAULT_CONTROL_PLANE = "https://shubhamrandive.com"
 _RECHECK_SECONDS = 6 * 60 * 60  # re-validate at most every 6h
 _TIMEOUT = 6  # network timeout (s); short so startup never hangs
 
-# in-process cache: (tier, checked_at_monotonic)
+# in-process cache: (role, checked_at_monotonic)
 _cache: tuple[str, float] | None = None
-
-
-def _device_id() -> str:
-    """Stable per-machine id, persisted at ~/.tabint/device (created once)."""
-    path = Path.home() / ".tabint" / "device"
-    try:
-        if path.exists():
-            return path.read_text(encoding="utf-8").strip()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        did = uuid.uuid4().hex
-        path.write_text(did, encoding="utf-8")
-        return did
-    except OSError:
-        # Non-persistable environment: fall back to a per-process id. The user
-        # may burn a device slot per run here, but it never blocks the server.
-        return "ephemeral-" + uuid.uuid4().hex
 
 
 def _control_plane_url() -> str:
@@ -65,43 +49,26 @@ def _control_plane_url() -> str:
 
 
 def _validate_remote(api_key: str) -> str:
-    """Call the control plane; return a tier string. Raises on any failure."""
+    """Call the control plane; return a role string ('free' or 'pro').
+
+    Raises on any failure so the caller can fail open.
+    """
     url = f"{_control_plane_url()}/api/validate-key"
-    payload = json.dumps({"api_key": api_key, "device_id": _device_id()}).encode("utf-8")
+    payload = json.dumps({"api_key": api_key}).encode("utf-8")
     req = urllib.request.Request(
-        url, data=payload, headers={"Content-Type": "application/json"}, method="POST"
+        url,
+        data=payload,
+        headers={"Content-Type": "application/json", "x-api-key": api_key},
+        method="POST",
     )
     with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
         body = json.loads(resp.read().decode("utf-8"))
-    tier = str(body.get("tier", FREE)).lower()
-    return tier if tier in {FREE, TRIAL, PAID, EXPIRED} else FREE
+    role = str(body.get("role", FREE)).lower()
+    return role if role in _ROLES else FREE
 
 
-def _local_mode() -> bool:
-    """Use a local DB (dev) when a control-plane DB is configured in the env."""
-    return bool(
-        os.environ.get("TABINT_CONTROL_DB", "").strip()
-        or os.environ.get("DATABASE_URL", "").strip()
-    )
-
-
-def _validate_local(api_key: str) -> str:
-    """Resolve via the control-plane EntitlementService against the local DB.
-    Lazy-imports tabint_control (a dev-only package); raises if unavailable so
-    the caller falls open to free."""
-    from tabint_control import create_provider, security  # dev-only
-    from tabint_control.services import EntitlementService
-
-    provider = create_provider()
-    try:
-        svc = EntitlementService(provider.api_keys, provider.devices)
-        return svc.resolve(security.hash_key(api_key), _device_id())
-    finally:
-        provider.close()
-
-
-def tier(force: bool = False) -> str:
-    """Current entitlement tier, cached with a periodic re-check.
+def role(force: bool = False) -> str:
+    """Current role ('free' or 'pro'), cached with a periodic re-check.
 
     Fails open to FREE on missing key or any error. Pass ``force=True`` to
     bypass the cache (used by an explicit refresh).
@@ -116,68 +83,53 @@ def tier(force: bool = False) -> str:
         _cache = (FREE, now)
         return FREE
     try:
-        if _local_mode():
-            resolved = _validate_local(api_key)   # dev: direct DuckDB via the service
-        else:
-            resolved = _validate_remote(api_key)  # prod: HTTP to shubham-site
+        resolved = _validate_remote(api_key)
     except Exception:  # noqa: BLE001 - fail-open is the whole point; never raise
-        # Keep a previous good tier if we have one, else fall open to free.
+        # Keep a previous good role if we have one, else fall open to free.
         resolved = _cache[0] if _cache is not None else FREE
     _cache = (resolved, now)
     return resolved
 
 
-def is_paid() -> bool:
-    """True if the install is entitled to paid features (trial or paid)."""
-    return tier() in _ENTITLED
+def is_pro() -> bool:
+    """True if the install is entitled to Pro features."""
+    return role() == PRO
 
 
 def status() -> dict:
-    """Human-facing entitlement summary (for an ``account_status`` tool)."""
-    t = tier()
-    local = _local_mode()
+    """Human-facing entitlement summary (for the ``account_status`` tool)."""
+    r = role()
     return {
-        "tier": t,
-        "paid_features_unlocked": t in _ENTITLED,
-        "device_id": _device_id(),
-        "mode": "local" if local else "remote",
-        "control_plane": (
-            os.environ.get("TABINT_CONTROL_DB") or os.environ.get("DATABASE_URL")
-            if local
-            else _control_plane_url()
-        ),
+        "role": r,
+        "pro_features_unlocked": r == PRO,
+        "control_plane": _control_plane_url(),
         "note": (
             "All analytics tools are free. Connectors and cloud artifact storage "
-            "require an active subscription — start one at https://shubhamrandive.com."
-            if t not in _ENTITLED
-            else "Subscription active — connectors and artifact storage are unlocked."
+            "are Pro — subscribe at https://shubhamrandive.com."
+            if r != PRO
+            else "Pro is active — connectors and artifact storage are unlocked."
         ),
     }
 
 
-class PaidFeatureRequired(Exception):
-    """Raised internally when a paid tool is used without entitlement."""
+def requires_pro(fn):
+    """Decorator for Pro-only MCP tools (connectors, artifact storage).
 
-
-def requires_paid(fn):
-    """Decorator for paid MCP tools (connectors, artifact storage).
-
-    If the install isn't entitled, returns a clear upgrade message instead of
+    If the install isn't Pro, returns a clear upgrade message instead of
     running — never raises out to the host, so the agent gets a usable result.
     """
     import functools
 
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
-        if not is_paid():
+        if not is_pro():
             return {
                 "ok": False,
-                "error": "paid_feature",
-                "tier": tier(),
+                "error": "pro_feature",
+                "role": role(),
                 "message": (
-                    f"'{fn.__name__}' is a paid feature (connectors + cloud artifact "
-                    "storage). Your current tier is "
-                    f"'{tier()}'. Start a subscription or free trial at "
+                    f"'{fn.__name__}' is a Pro feature (connectors + cloud artifact "
+                    f"storage). Your current role is '{role()}'. Subscribe at "
                     "https://shubhamrandive.com to unlock it."
                 ),
             }

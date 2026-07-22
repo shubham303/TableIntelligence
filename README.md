@@ -86,7 +86,7 @@ in every config below.
 
 | Variable | Required | Default | Purpose |
 | --- | --- | --- | --- |
-| `TABINT_API_KEY` | **yes** | — | Your key from `https://shubhamrandive.com/dashboard/account`. Absent → free tier (all analytics still work; paid connectors/reports/outreach are gated). |
+| `TABINT_API_KEY` | **yes** | — | Your `ti_…` key from `https://shubhamrandive.com/dashboard/account`. Absent → free role (all analytics still work; Pro-only connectors/reports/outreach are gated). |
 | `TABINT_CONTROL_PLANE_URL` | no | `https://shubhamrandive.com` | Base URL of the control plane (reports, folders, key validation). |
 | `TABULAR_BASE` | no | current dir | Where on-disk sessions are stored (`<base>/.tableint/sessions/`). |
 
@@ -96,7 +96,7 @@ Register the server (Claude Code CLI):
 
 ```bash
 claude mcp add tabint \
-  --env TABINT_API_KEY=sk_your_key_here \
+  --env TABINT_API_KEY=ti_your_key_here \
   --env TABINT_CONTROL_PLANE_URL=https://shubhamrandive.com \
   -- tabint-mcp
 ```
@@ -109,7 +109,7 @@ claude mcp add tabint \
     "tabint": {
       "command": "tabint-mcp",
       "env": {
-        "TABINT_API_KEY": "sk_your_key_here",
+        "TABINT_API_KEY": "ti_your_key_here",
         "TABINT_CONTROL_PLANE_URL": "https://shubhamrandive.com"
       }
     }
@@ -125,7 +125,7 @@ Add to `~/.codex/config.toml` (Codex reads MCP servers from `[mcp_servers.*]`):
 [mcp_servers.tabint]
 command = "tabint-mcp"
 args = []
-env = { TABINT_API_KEY = "sk_your_key_here", TABINT_CONTROL_PLANE_URL = "https://shubhamrandive.com" }
+env = { TABINT_API_KEY = "ti_your_key_here", TABINT_CONTROL_PLANE_URL = "https://shubhamrandive.com" }
 ```
 
 ### Cursor
@@ -138,7 +138,7 @@ Add to `.cursor/mcp.json` in your project (or *Settings → MCP* for global):
     "tabint": {
       "command": "tabint-mcp",
       "env": {
-        "TABINT_API_KEY": "sk_your_key_here",
+        "TABINT_API_KEY": "ti_your_key_here",
         "TABINT_CONTROL_PLANE_URL": "https://shubhamrandive.com"
       }
     }
@@ -149,11 +149,11 @@ Add to `.cursor/mcp.json` in your project (or *Settings → MCP* for global):
 ### Verify it works
 
 After registering the server in any agent, ask it to call the `account_status`
-tool — it should return your tier:
+tool — it should return your role:
 
 ```text
 > call account_status
-{"tier": "paid", "entitled": true, ...}   # or "free" if no key set
+{"role": "pro", "pro_features_unlocked": true, ...}   # or {"role": "free", ...} if no key set
 ```
 
 Or from the CLI directly:
