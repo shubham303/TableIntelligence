@@ -17,11 +17,14 @@ The package is on PyPI. Requires Python ≥ 3.10.
 
 ```bash
 # MCP server — no install needed, runs isolated via uvx
-uvx tabint-mcp --help
+uvx --from tabint tabint-mcp --help
 
 # or install the CLI + MCP server into your environment
 pip install tabint
 ```
+
+> The package is named `tabint`; `tabint-mcp` is the server command inside it,
+> so uvx/pipx need `--from tabint` to locate the package.
 
 This installs four console scripts (two branded aliases):
 
@@ -61,7 +64,7 @@ Register via the Claude Code CLI:
 claude mcp add tabint \
   --env TABINT_API_KEY=ti_your_key_here \
   --env TABINT_CONTROL_PLANE_URL=https://shubhamrandive.com \
-  -- tabint-mcp
+  -- uvx --from tabint tabint-mcp
 ```
 
 …or paste this into the MCP config JSON (Cowork / Desktop):
@@ -70,7 +73,8 @@ claude mcp add tabint \
 {
   "mcpServers": {
     "tabint": {
-      "command": "tabint-mcp",
+      "command": "uvx",
+      "args": ["--from", "tabint", "tabint-mcp"],
       "env": {
         "TABINT_API_KEY": "ti_your_key_here",
         "TABINT_CONTROL_PLANE_URL": "https://shubhamrandive.com"
@@ -87,8 +91,8 @@ Codex reads MCP servers from `[mcp_servers.*]` in `~/.codex/config.toml`
 
 ```toml
 [mcp_servers.tabint]
-command = "tabint-mcp"
-args = []
+command = "uvx"
+args = ["--from", "tabint", "tabint-mcp"]
 env = { TABINT_API_KEY = "ti_your_key_here", TABINT_CONTROL_PLANE_URL = "https://shubhamrandive.com" }
 ```
 
@@ -101,7 +105,8 @@ global install):
 {
   "mcpServers": {
     "tabint": {
-      "command": "tabint-mcp",
+      "command": "uvx",
+      "args": ["--from", "tabint", "tabint-mcp"],
       "env": {
         "TABINT_API_KEY": "ti_your_key_here",
         "TABINT_CONTROL_PLANE_URL": "https://shubhamrandive.com"

@@ -22,7 +22,7 @@ The package is on PyPI. Requires Python ≥ 3.10.
 
 ```bash
 # MCP server — no install needed, runs isolated via uvx
-uvx tabint-mcp --help
+uvx --from tabint tabint-mcp --help
 
 # or install the CLI + MCP server into your environment
 pip install tabint
@@ -35,8 +35,10 @@ tabint --help        # the CLI
 tabint-mcp --help    # the MCP server (stdio transport)
 ```
 
-> No `uvx`? Install it with `curl -LsSf https://astral.sh/uv/install.sh | sh`,
-> or use `pipx run tabint-mcp --help` instead.
+> The package is named `tabint`; `tabint-mcp` is the server command inside it,
+> so uvx/pipx need `--from tabint` to find the package. No `uvx`? Install it
+> with `curl -LsSf https://astral.sh/uv/install.sh | sh`, or use
+> `pipx run --from tabint tabint-mcp --help` instead.
 
 ## Intended usage
 
@@ -97,7 +99,7 @@ Register the server (Claude Code CLI):
 claude mcp add tabint \
   --env TABINT_API_KEY=ti_your_key_here \
   --env TABINT_CONTROL_PLANE_URL=https://shubhamrandive.com \
-  -- uvx tabint-mcp
+  -- uvx --from tabint tabint-mcp
 ```
 
 …or paste the JSON block into the MCP config (Cowork / Desktop):
@@ -107,7 +109,7 @@ claude mcp add tabint \
   "mcpServers": {
     "tabint": {
       "command": "uvx",
-      "args": ["tabint-mcp"],
+      "args": ["--from", "tabint", "tabint-mcp"],
       "env": {
         "TABINT_API_KEY": "ti_your_key_here",
         "TABINT_CONTROL_PLANE_URL": "https://shubhamrandive.com"
@@ -124,7 +126,7 @@ Add to `~/.codex/config.toml` (Codex reads MCP servers from `[mcp_servers.*]`):
 ```toml
 [mcp_servers.tabint]
 command = "uvx"
-args = ["tabint-mcp"]
+args = ["--from", "tabint", "tabint-mcp"]
 env = { TABINT_API_KEY = "ti_your_key_here", TABINT_CONTROL_PLANE_URL = "https://shubhamrandive.com" }
 ```
 
@@ -137,7 +139,7 @@ Add to `.cursor/mcp.json` in your project (or *Settings → MCP* for global):
   "mcpServers": {
     "tabint": {
       "command": "uvx",
-      "args": ["tabint-mcp"],
+      "args": ["--from", "tabint", "tabint-mcp"],
       "env": {
         "TABINT_API_KEY": "ti_your_key_here",
         "TABINT_CONTROL_PLANE_URL": "https://shubhamrandive.com"
