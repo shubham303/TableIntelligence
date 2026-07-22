@@ -1,9 +1,9 @@
 """Tests for the outreach agent surface: the agent prompt, the free explainer
-tool, the ready-to-send filter, and paid-tier gating on the CRUD tools.
+tool, the ready-to-send filter, and Pro-role gating on the CRUD tools.
 
-Tools are called directly (same pattern as test_mcp_server.py). `requires_paid`
-wraps the CRUD tools; with no TABINT_API_KEY in CI, `tier()` resolves to "free"
-and they short-circuit to an upgrade dict. We force "paid" via monkeypatch where
+Tools are called directly (same pattern as test_mcp_server.py). `requires_pro`
+wraps the CRUD tools; with no TABINT_API_KEY in CI, `role()` resolves to "free"
+and they short-circuit to an upgrade dict. We force "pro" via monkeypatch where
 we need the tool body to actually run.
 """
 import pytest
@@ -64,25 +64,29 @@ def test_how_it_works_is_static_dict_with_five_steps():
     assert r["load_playbook_prompt"] == "outreach_agent"
 
 
-def test_how_it_works_callable_without_paid_tier():
-    # No TABINT_API_KEY in CI → tier is "free". If the tool were accidentally
-    # wrapped by requires_paid, it would return {"error": "paid_feature"}.
+def test_how_it_works_callable_without_pro_role():
+    # No TABINT_API_KEY in CI → role is "free". If the tool were accidentally
+    # wrapped by requires_pro, it would return {"error": "pro_feature"}.
     r = M.outreach_how_it_works()
-    assert r.get("error") != "paid_feature"
+    assert r.get("error") != "pro_feature"
 
 
 # --- ready-to-send filter --------------------------------------------------- #
 
-def _force_paid(monkeypatch):
+def _force_pro(monkeypatch):
     """Bypass entitlement AND the API-key-configured check so the wrapped tool
     body actually runs (CI has no TABINT_API_KEY)."""
-    monkeypatch.setattr(M.entitlement, "is_paid", lambda: True)
-    monkeypatch.setattr(M.entitlement, "tier", lambda: "paid")
+    monkeypatch.setattr(M.entitlement, "is_pro", lambda: True)
+    monkeypatch.setattr(M.entitlement, "role", lambda: "pro")
     monkeypatch.setattr(_platform, "configured", lambda: True)
 
 
 def test_ready_emails_filters_out_sent(monkeypatch):
-    _force_paid(monkeypatch)
+    _force_pro(monkeypatch)
+
+
+def test_ready_emails_filters_out_sent(monkeypatch):
+    _force_pro(monkeypatch)
     payload = {"emails": [
         {"id": "e1", "status": "draft"},
         {"id": "e2", "status": "sent"},
@@ -97,7 +101,7 @@ def test_ready_emails_filters_out_sent(monkeypatch):
 
 
 def test_ready_emails_handles_missing_envelope(monkeypatch):
-    _force_paid(monkeypatch)
+    _force_pro(monkeypatch)
     # Defensive: API unexpectedly returns an error dict instead of {emails: [...]}
     monkeypatch.setattr(_platform, "list_emails", lambda cid, status=None: {"error": "oops"})
     r = M.outreach_list_ready_to_send("c1")
@@ -114,20 +118,20 @@ def test_platform_ready_emails_does_not_mutate_input(monkeypatch):
     assert [e["status"] for e in out["emails"]] == ["draft"]
 
 
-# --- paid gating regression on the CRUD surface ----------------------------- #
+# --- Pro gating regression on the CRUD surface ------------------------------ #
 
 @pytest.mark.parametrize("tool", [
     "outreach_create_template", "outreach_setup_campaign", "outreach_add_email",
     "outreach_list_emails", "outreach_update_email", "outreach_delete_email",
     "outreach_list_ready_to_send", "outreach_list_received",
 ])
-def test_outreach_crud_tools_are_paid_gated(monkeypatch, tool):
+def test_outreach_crud_tools_are_pro_gated(monkeypatch, tool):
     # Force FREE explicitly and stub the platform so the test is robust to a real
-    # API key in the env. requires_paid runs first → returns paid_feature before
+    # API key in the env. requires_pro runs first → returns pro_feature before
     # any HTTP call, so the platform stub never runs.
-    monkeypatch.setattr(M.entitlement, "is_paid", lambda: False)
-    monkeypatch.setattr(M.entitlement, "tier", lambda: "free")
+    monkeypatch.setattr(M.entitlement, "is_pro", lambda: False)
+    monkeypatch.setattr(M.entitlement, "role", lambda: "free")
     monkeypatch.setattr(_platform, "configured", lambda: True)
     fn = getattr(M, tool)
     r = fn("x")
-    assert r.get("error") == "paid_feature"
+    assert r.get("error") == "pro_feature"

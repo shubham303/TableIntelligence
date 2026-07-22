@@ -58,5 +58,11 @@ User's machine                              Cloud (shubham-site)
   the user explicitly saves.
 - All persisted data goes through the platform APIs — the MCP server never talks to a database
   directly.
-- Analytics tools are free; connectors (outreach, etc.) and cloud storage are the paid tier, gated
-  server-side on the API by subscription and mirrored client-side by `entitlement.requires_paid`.
+- Analytics tools are free; connectors (outreach, etc.) and cloud storage are the Pro tier, gated
+  server-side on the API by subscription and mirrored client-side by `entitlement.requires_pro`.
+- **Auth/entitlement model**: two roles — `free` and `pro`. The MCP sends the user's API key in the
+  `x-api-key` header on every platform call and validates it via `POST /api/validate-key`, which
+  returns `{ role, trial_until }`. Roles are derived server-side from the
+  [better-auth-razorpay](https://github.com/iamjasonkendrick/better-auth-razorpay) subscription
+  table (active or within-trial => pro). The `control-plane/` Python package (local DuckDB
+  replacement for Neon) has been removed — Neon is the sole source of truth.

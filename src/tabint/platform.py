@@ -1,9 +1,13 @@
-"""Client for the Table Intelligence website APIs (reports, folders).
+"""Client for the Table Intelligence website APIs (reports, folders, outreach).
 
 The MCP server holds no user data — it calls the website (the control plane) over
 HTTP with the user's API key. Configure with:
   ``TABINT_CONTROL_PLANE_URL``  base URL of the site (default https://shubhamrandive.com)
   ``TABINT_API_KEY``            the user's key (from the website after signup)
+
+The API key is sent in the ``x-api-key`` header (BetterAuth's apiKey plugin
+default). Browser sessions use ``Authorization: Bearer <jwt>`` instead — the
+two credential types are intentionally distinguished at the wire level.
 
 Stdlib only. Returns the API's JSON; on an HTTP error it returns the error body so
 the agent can relay a useful message (e.g. an upgrade prompt) instead of crashing.
@@ -38,7 +42,7 @@ def _request(method: str, path: str, payload: dict | None = None) -> dict:
         f"{_base()}{path}",
         data=data,
         method=method,
-        headers={"Content-Type": "application/json", "Authorization": f"Bearer {_key()}"},
+        headers={"Content-Type": "application/json", "x-api-key": _key()},
     )
     try:
         with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
