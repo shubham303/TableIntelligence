@@ -1,16 +1,17 @@
-"""Entitlement / role gating for the Table Intelligence MCP server.
+"""Entitlement / role lookup for the Table Intelligence MCP server.
 
-Local-first pricing model: all analytics tools are free forever; connectors
-and cloud artifact storage are Pro. This module answers one question — *is
-this install entitled to Pro features?* — by validating the user's API key
-against the control plane (the shubham-site platform).
+The MCP server is free to use and imposes NO client-side gating: every tool
+runs locally regardless of subscription. This module exists only to let the
+``account_status`` tool report the linked account's tier (free/pro) — the
+authoritative gating for paid surfaces (persisting outreach/reports to the
+dashboard) is enforced server-side by the API.
 
 Two roles: ``free`` and ``pro``. The platform derives the role from the
 better-auth-razorpay subscription table (active or within-trial => pro).
 
 Design rules:
   * **Fails open to the free role.** Any network/config error => ``free``. The
-    server must never crash or block core analytics because auth was unreachable.
+    server must never crash because the control plane was unreachable.
   * **Stdlib only** (``urllib``) — no new runtime dependency.
   * **Cached** with a periodic re-check so we don't hit the network per call.
 
@@ -92,7 +93,7 @@ def role(force: bool = False) -> str:
 
 
 def is_pro() -> bool:
-    """True if the install is entitled to Pro features."""
+    """True if the linked account is on the Pro tier (informational only)."""
     return role() == PRO
 
 
@@ -104,35 +105,10 @@ def status() -> dict:
         "pro_features_unlocked": r == PRO,
         "control_plane": _control_plane_url(),
         "note": (
-            "All analytics tools are free. Connectors and cloud artifact storage "
-            "are Pro — subscribe at https://shubhamrandive.com."
+            "The MCP server is free to use. Paid features (cloud artifact "
+            "storage, dashboard sync) are enforced by the API; subscribe at "
+            "https://shubhamrandive.com to unlock them."
             if r != PRO
-            else "Pro is active — connectors and artifact storage are unlocked."
+            else "Pro is active — dashboard sync and artifact storage are unlocked."
         ),
     }
-
-
-def requires_pro(fn):
-    """Decorator for Pro-only MCP tools (connectors, artifact storage).
-
-    If the install isn't Pro, returns a clear upgrade message instead of
-    running — never raises out to the host, so the agent gets a usable result.
-    """
-    import functools
-
-    @functools.wraps(fn)
-    def wrapper(*args, **kwargs):
-        if not is_pro():
-            return {
-                "ok": False,
-                "error": "pro_feature",
-                "role": role(),
-                "message": (
-                    f"'{fn.__name__}' is a Pro feature (connectors + cloud artifact "
-                    f"storage). Your current role is '{role()}'. Subscribe at "
-                    "https://shubhamrandive.com to unlock it."
-                ),
-            }
-        return fn(*args, **kwargs)
-
-    return wrapper

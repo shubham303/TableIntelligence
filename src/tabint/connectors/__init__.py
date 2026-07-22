@@ -1,8 +1,8 @@
 """Connectors — pull data from a source and normalize it to the canonical contract.
 
 Single MCP server, many connectors: each registers itself and emits the shapes in
-`contract.py`. Connectors are a Pro feature; the MCP tools that invoke them are gated
-with `entitlement.requires_pro`. Data is fetched provider→machine directly.
+`contract.py`. The MCP server is free to use with no client-side gating; data is
+fetched provider→machine directly (it never transits the control plane).
 """
 from . import contract
 from .base import Connector, get_connector, list_connectors, register
