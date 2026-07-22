@@ -17,7 +17,6 @@ keywords = [
 ]
 classifiers = [
     "License :: OSI Approved :: Apache Software License",
-    "Framework :: MCP",
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
     "Intended Audience :: Developers",
