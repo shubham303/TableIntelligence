@@ -180,8 +180,8 @@ most important part; the whole campaign leans on it.
 Interview the user. Ask the questions below (batch a few per turn, don't dump
 all twelve at once). After each batch, summarize what you've captured so far,
 propose defaults for anything unanswered, and keep iterating until the user is
-happy. Only then assemble the answers into a single template `prompt` string and
-call `outreach_create_template(title, prompt)`.
+happy. State your default assumptions up front (tone, length, personalization
+level, default prospect count) so the user can simply confirm.
 
 Ask:
   1. Type of outreach — what is the product/service being pitched?
@@ -205,11 +205,27 @@ Ask:
      should actually appear in the email (most research informs targeting, only
      a little makes it into the body).
 
-State your default assumptions up front (tone, length, personalization level,
-default prospect count) so the user can simply confirm. The finished template
-`prompt` must read as a self-contained instruction set a future campaign run
-can follow with no further input — capturing audience, targeting, research plan,
-email structure, tone, and personalization rules.
+DO NOT CREATE THE TEMPLATE YET. Once the interview is settled, assemble a
+template TITLE and a full DRAFT `prompt` string (the self-contained instruction
+set a future campaign run can follow with no further input — capturing audience,
+targeting, research plan, email structure, tone, and personalization rules), and
+show the user the full draft inline. Do NOT call `outreach_create_template` as
+part of this step.
+
+Then enter a DRAFT → CONFIRM loop with the user:
+  • Present the proposed `title` and the complete draft `prompt`.
+  • Explicitly ask: "Is this ready to save, or do you want to change anything?"
+    (tone, structure, targeting, defaults, etc.).
+  • If the user requests changes, revise the draft and re-show it. Keep
+    iterating until they confirm it is ready. Each revision stays inline — no
+    tool call.
+  • Only once the user EXPLICITLY confirms the template is final/ready
+    (e.g. "looks good", "create it", "yes", "save it") do you call
+    `outreach_create_template(title, prompt)`.
+
+Never assume a silent "yes." If the user's last message was a requested edit,
+that is NOT confirmation — show the revised draft and ask again. If intent is
+ambiguous ("looks okay I guess"), confirm explicitly before creating.
 
 STAGE 2 — RUN A CAMPAIGN (autonomous, no user in the loop once started).
 The user starts this in natural language, e.g. "run a campaign using the X
