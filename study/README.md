@@ -17,6 +17,16 @@ skimmed. Every vertical note cross-links back to `data science/` by number.
   flagship.
 - **`nonprofits/`** — richest *public* data (IRS 990s), donor retention, mission-framed
   findings.
+- **`seo/`** — the SEO agent's knowledge base: technical SEO, metadata/schema, keyword
+  strategy, on-page content, local SEO, content/CMS, link building, competitor & SERP
+  analysis, and the closed loop (monitor → ship → re-measure). Written to be read by the
+  `seo_agent` — it combines DataForSEO + Google Search Console + the codebase/CMS.
+- **`social/`** — the social-content agent's knowledge base: the three-layer
+  instruction model (user template > agent instruction > platform instruction),
+  the platform matrix (reddit/medium/linkedin/twitter/facebook — structure,
+  self-promo policy, format, recency), the authoring craft (dedup + topic
+  intake), and the feedback loop (rejections → next run → proposed template
+  changes). Written to be read by the `social_agent`.
 - **`delivering-insights/`** — the craft: turning a number into a finding, structuring a
   report clients act on, and the credibility guardrails. **This is your real bottleneck.**
 

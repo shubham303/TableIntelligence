@@ -157,3 +157,135 @@ def save_received(sender: str, subject: str, body: str, received_at: str | None 
 
 def list_received() -> dict:
     return _request("GET", "/api/outreach/received")
+
+
+# --------------------------------------------------------------------------- #
+# social connector — templates, campaigns, search targets, posts, feedback,
+# template-change proposals. Data/CRUD only. The agent never scrapes or posts;
+# it stores templates/campaigns, emits SEARCH SPECS (the harness runs the
+# reads), stores drafted posts + replies, and captures feedback. Mirrors the
+# outreach connector.
+# --------------------------------------------------------------------------- #
+
+# templates
+def social_create_template(title: str, prompt: str, status: str = "active") -> dict:
+    return _request("POST", "/api/social/templates",
+                    {"title": title, "prompt": prompt, "status": status})
+
+def social_list_templates(status: str | None = None, frm: str | None = None,
+                          to: str | None = None) -> dict:
+    return _request("GET", "/api/social/templates" + _qs({"status": status, "from": frm, "to": to}))
+
+def social_get_template(template_id: str) -> dict:
+    return _request("GET", f"/api/social/templates/{template_id}")
+
+def social_update_template(template_id: str, fields: dict) -> dict:
+    return _request("PATCH", f"/api/social/templates/{template_id}", fields)
+
+def social_delete_template(template_id: str) -> dict:
+    return _request("DELETE", f"/api/social/templates/{template_id}")
+
+
+# campaigns (setup freezes the template prompt into the campaign)
+def social_setup_campaign(template_id: str, title: str | None = None) -> dict:
+    return _request("POST", "/api/social/campaigns",
+                    {"template_id": template_id, "title": title})
+
+def social_get_campaign(campaign_id: str) -> dict:
+    return _request("GET", f"/api/social/campaigns/{campaign_id}")
+
+def social_list_campaigns(status: str | None = None, template_id: str | None = None,
+                          frm: str | None = None, to: str | None = None) -> dict:
+    return _request("GET", "/api/social/campaigns" + _qs(
+        {"status": status, "template_id": template_id, "from": frm, "to": to}))
+
+
+# search targets — structured SEARCH SPECS the harness runs (agent does not scrape)
+def social_add_search_target(campaign_id: str, platform: str, search_type: str,
+                             queries: list, scopes=None, recency: str = "7d",
+                             keywords=None, max_results: int = 15) -> dict:
+    return _request("POST", "/api/social/search-targets", {
+        "campaign_id": campaign_id, "platform": platform, "search_type": search_type,
+        "queries": queries, "scopes": scopes, "recency": recency,
+        "keywords": keywords, "max_results": max_results,
+    })
+
+def social_list_search_targets(campaign_id: str, platform: str | None = None,
+                               status: str | None = None) -> dict:
+    return _request("GET", "/api/social/search-targets" + _qs(
+        {"campaign_id": campaign_id, "platform": platform, "status": status}))
+
+def social_update_search_target(search_target_id: str, fields: dict) -> dict:
+    return _request("PATCH", f"/api/social/search-targets/{search_target_id}", fields)
+
+def social_delete_search_target(search_target_id: str) -> dict:
+    return _request("DELETE", f"/api/social/search-targets/{search_target_id}")
+
+
+# posts — unified author + reply content
+def social_add_post(campaign_id: str, platform: str, kind: str, content: str,
+                    content_format: str = "text", target_url=None,
+                    target_kind=None, target_title=None, target_author=None,
+                    notes=None) -> dict:
+    return _request("POST", "/api/social/posts", {
+        "campaign_id": campaign_id, "platform": platform, "kind": kind,
+        "content": content, "content_format": content_format,
+        "target_url": target_url, "target_kind": target_kind,
+        "target_title": target_title, "target_author": target_author, "notes": notes,
+    })
+
+def social_list_posts(campaign_id: str, status: str | None = None,
+                      platform: str | None = None, kind: str | None = None) -> dict:
+    return _request("GET", "/api/social/posts" + _qs(
+        {"campaign_id": campaign_id, "status": status, "platform": platform, "kind": kind}))
+
+def social_get_post(post_id: str) -> dict:
+    return _request("GET", f"/api/social/posts/{post_id}")
+
+def social_update_post(post_id: str, fields: dict) -> dict:
+    return _request("PATCH", f"/api/social/posts/{post_id}", fields)
+
+def social_delete_post(post_id: str, reason: str | None = None) -> dict:
+    return _request("DELETE", f"/api/social/posts/{post_id}",
+                    {"reason": reason} if reason else None)
+
+
+# feedback — rejections + notes (the agent reads before each run)
+def social_add_feedback(campaign_id: str, kind: str, reason: str,
+                        note: str | None = None, post_id: str | None = None) -> dict:
+    return _request("POST", "/api/social/feedback", {
+        "campaign_id": campaign_id, "kind": kind, "reason": reason,
+        "note": note, "post_id": post_id,
+    })
+
+def social_list_feedback(campaign_id: str | None = None,
+                         kind: str | None = None) -> dict:
+    return _request("GET", "/api/social/feedback" + _qs(
+        {"campaign_id": campaign_id, "kind": kind}))
+
+def social_delete_feedback(feedback_id: str) -> dict:
+    return _request("DELETE", f"/api/social/feedback/{feedback_id}")
+
+
+# template-change proposals — durable feedback becomes an approved patch
+def social_propose_template_change(template_id: str, change_kind: str,
+                                   rationale: str, proposed_patch: str,
+                                   source_feedback_ids=None) -> dict:
+    return _request("POST", "/api/social/template-changes", {
+        "template_id": template_id, "change_kind": change_kind,
+        "rationale": rationale, "proposed_patch": proposed_patch,
+        "source_feedback_ids": source_feedback_ids,
+    })
+
+def social_list_template_changes(template_id: str | None = None,
+                                 status: str | None = None) -> dict:
+    return _request("GET", "/api/social/template-changes" + _qs(
+        {"template_id": template_id, "status": status}))
+
+def social_update_template_change(change_id: str, status: str,
+                                 decision_note: str | None = None) -> dict:
+    return _request("PATCH", f"/api/social/template-changes/{change_id}", {
+        "status": status, "decision_note": decision_note})
+
+def social_apply_template_change(change_id: str) -> dict:
+    return _request("POST", f"/api/social/template-changes/{change_id}/apply")
