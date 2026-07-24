@@ -61,11 +61,22 @@ Homepage = "https://github.com/shubham303/TableIntelligence"
 Repository = "https://github.com/shubham303/TableIntelligence"
 
 [project.scripts]
-tabint = "tabint.cli:main"
-tabint-mcp = "tabint.mcp_server:main"
+tabint = "tabint.app.cli:main"
+tabint-mcp = "tabint.app.mcp_server:main"
 # Branded aliases (product name: Table Intelligence). Same entry points.
-table-intelligence = "tabint.cli:main"
-table-intelligence-mcp = "tabint.mcp_server:main"
+table-intelligence = "tabint.app.cli:main"
+table-intelligence-mcp = "tabint.app.mcp_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+# Two buckets: `unit` (everything mocked/faked — fast) and `integration`
+# (real DuckDB / filesystem / network — slower). Unmarked runs collect both;
+# `pytest -m unit` gives a fast feedback loop.
+markers = [
+    "unit: isolated tests with all dependencies mocked or faked",
+    "integration: tests exercising real DuckDB, filesystem, or network I/O",
+]
