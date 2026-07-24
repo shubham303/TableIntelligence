@@ -69,3 +69,14 @@ table-intelligence-mcp = "tabint.app.mcp_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+# Two buckets: `unit` (everything mocked/faked — fast) and `integration`
+# (real DuckDB / filesystem / network — slower). Unmarked runs collect both;
+# `pytest -m unit` gives a fast feedback loop.
+markers = [
+    "unit: isolated tests with all dependencies mocked or faked",
+    "integration: tests exercising real DuckDB, filesystem, or network I/O",
+]
