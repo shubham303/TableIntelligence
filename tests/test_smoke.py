@@ -61,4 +61,4 @@ def test_session_analyze_association_runs():
 
 def test_version():
     """Package exposes __version__."""
-    assert tabint.__version__ == "0.1.0"
+    assert tabint.__version__ == "0.1.1"

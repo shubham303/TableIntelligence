@@ -6,9 +6,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from tabint import persistence
-from tabint._serialize import jsonable
-from tabint.cli import main
+from tabint.analysis.db import persistence
+from tabint.shared.serialize import jsonable
+from tabint.app.cli import main
 
 
 def _csv(tmp_path, name, df):
@@ -103,5 +103,5 @@ def test_cli_explain_prediction(tmp_path, capsys):
 
 
 def test_mcp_exposes_explain_prediction():
-    from tabint import mcp_server as M
+    from tabint.analysis import tools as M
     assert hasattr(M, "explain_prediction")

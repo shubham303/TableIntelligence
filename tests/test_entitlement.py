@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from tabint import entitlement
+from tabint.integration.service import entitlement
 
 
 @pytest.fixture(autouse=True)

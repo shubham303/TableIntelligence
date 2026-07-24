@@ -8,19 +8,21 @@ imposes no role gating; it only checks that an API key is configured (the
 """
 import pytest
 
-from tabint import mcp_server as M
-from tabint import platform as _platform
+from tabint.outreach import tools as M
+from tabint.outreach import prompts
+from tabint.integration.service import platform as _platform
+from tabint.integration.service import entitlement
 
 
 # --- the agent prompt ------------------------------------------------------- #
 
 def test_outreach_agent_prompt_is_non_empty_string():
-    p = M.outreach_agent()
+    p = prompts.outreach_agent()
     assert isinstance(p, str) and len(p) > 500
 
 
 def test_outreach_agent_prompt_covers_five_stages():
-    p = M.outreach_agent()
+    p = prompts.outreach_agent()
     for marker in (
         "STAGE 1", "STAGE 2", "STAGE 3", "STAGE 4", "STAGE 5",
         "CREATE A TEMPLATE", "RUN A CAMPAIGN", "STOP & REPORT",
@@ -30,20 +32,20 @@ def test_outreach_agent_prompt_covers_five_stages():
 
 
 def test_outreach_agent_prompt_states_it_does_not_send_email():
-    p = M.outreach_agent()
+    p = prompts.outreach_agent()
     assert "DOES NOT SEND EMAIL" in p or "do not send email" in p.lower()
     # and the send stage must defer to the user's own email tool
     assert "email tool" in p.lower() or "email mcp" in p.lower()
 
 
 def test_outreach_agent_prompt_carries_default_prospect_count_and_disambiguation():
-    p = M.outreach_agent()
+    p = prompts.outreach_agent()
     assert "50" in p                      # default prospects per campaign
     assert "Disambiguation".lower() in p.lower() or "DISAMBIGUATION" in p
 
 
 def test_outreach_agent_prompt_lists_the_tools():
-    p = M.outreach_agent()
+    p = prompts.outreach_agent()
     for tool in (
         "outreach_create_template", "outreach_setup_campaign", "outreach_add_email",
         "outreach_list_ready_to_send", "outreach_update_email",
@@ -134,8 +136,8 @@ def test_outreach_crud_tools_not_role_gated(monkeypatch, tool):
     # Even with a FREE role and a configured key, the tool must reach the
     # platform layer (not short-circuit to a pro_feature upgrade dict). We stub
     # the platform call to assert the body ran.
-    monkeypatch.setattr(M.entitlement, "is_pro", lambda: False)
-    monkeypatch.setattr(M.entitlement, "role", lambda: "free")
+    monkeypatch.setattr(entitlement, "is_pro", lambda: False)
+    monkeypatch.setattr(entitlement, "role", lambda: "free")
     monkeypatch.setattr(_platform, "configured", lambda: True)
     monkeypatch.setattr(_platform, "list_emails", lambda *a, **k: {"emails": []})
     monkeypatch.setattr(_platform, "list_received", lambda *a, **k: {"emails": []})

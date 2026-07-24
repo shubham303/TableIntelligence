@@ -2,7 +2,7 @@
 import pandas as pd
 import pytest
 
-from tabint.identity import fingerprint_dataframe, fingerprint_series, operation_key
+from tabint.shared.identity import fingerprint_dataframe, fingerprint_series, operation_key
 
 
 def test_operation_key_is_deterministic():

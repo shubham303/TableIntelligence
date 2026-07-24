@@ -4,16 +4,17 @@ import shutil
 
 import pytest
 
-from tabint import mcp_server as M
+from tabint.analysis import tools as M
+from tabint.shared import server as _srv
 
 
 @pytest.fixture(autouse=True)
 def isolate(tmp_path):
     """Point the server at a temp session root and clear the live registry."""
-    M._BASE = str(tmp_path)
-    M._SESSIONS.clear()
+    _srv._BASE = str(tmp_path)
+    _srv._SESSIONS.clear()
     yield
-    M._SESSIONS.clear()
+    _srv._SESSIONS.clear()
 
 
 def _fixtures(tmp_path, *names):
@@ -57,7 +58,7 @@ def test_feature_computation_tools_build_model_eligible_columns(tmp_path):
 def test_train_evaluate_persist_across_cache_eviction(tmp_path):
     key = M.create_session(_fixtures(tmp_path, "loan_applications.csv"))["session_key"]
     M.train_classifier(key, "loan_applications", "is_approved", name="m")
-    M._SESSIONS.clear()                       # simulate server restart / eviction
+    _srv._SESSIONS.clear()                    # simulate server restart / eviction
     r = M.evaluate(key, "loan_applications", "m")   # reopened from disk by key
     assert 0.0 <= r["values"]["accuracy"] <= 1.0
 
@@ -76,7 +77,7 @@ def test_unknown_session_raises(tmp_path):
 
 
 def test_scratchpad_requires_live_session(tmp_path, monkeypatch):
-    from tabint import scratchpad
+    from tabint.shared import scratchpad
 
     monkeypatch.setattr(scratchpad, "_DIR", tmp_path / ".tableintelligence")
     # No active session for this key → every scratchpad op must raise.
@@ -89,7 +90,7 @@ def test_scratchpad_requires_live_session(tmp_path, monkeypatch):
 
 
 def test_scratchpad_add_read_with_live_session(tmp_path, monkeypatch):
-    from tabint import scratchpad
+    from tabint.shared import scratchpad
 
     monkeypatch.setattr(scratchpad, "_DIR", tmp_path / ".tableintelligence")
     key = M.create_session(_fixtures(tmp_path, "customers.csv"))["session_key"]

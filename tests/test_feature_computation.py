@@ -10,8 +10,8 @@ import numpy as np
 import pytest
 
 from tabint import Session
-from tabint.analytics import _prep
-from tabint.analytics import feature_computation as fc
+from tabint.analysis.service import _prep
+from tabint.analysis.service.algorithms import feature_computation as fc
 
 
 def _session(fixture: str, tmp_path) -> Session:

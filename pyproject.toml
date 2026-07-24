@@ -61,11 +61,11 @@ Homepage = "https://github.com/shubham303/TableIntelligence"
 Repository = "https://github.com/shubham303/TableIntelligence"
 
 [project.scripts]
-tabint = "tabint.cli:main"
-tabint-mcp = "tabint.mcp_server:main"
+tabint = "tabint.app.cli:main"
+tabint-mcp = "tabint.app.mcp_server:main"
 # Branded aliases (product name: Table Intelligence). Same entry points.
-table-intelligence = "tabint.cli:main"
-table-intelligence-mcp = "tabint.mcp_server:main"
+table-intelligence = "tabint.app.cli:main"
+table-intelligence-mcp = "tabint.app.mcp_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from tabint import persistence
+from tabint.analysis.db import persistence
 
 
 def _csv(tmp_path, name, df):

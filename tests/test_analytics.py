@@ -265,7 +265,7 @@ class TestSupervised:
 
     def test_tabicl_rejects_oversized_table(self, tmp_path, monkeypatch):
         """The row-count guard fires before we ever touch the optional model."""
-        from tabint.analytics import supervised
+        from tabint.analysis.service.algorithms import supervised
         monkeypatch.setattr(supervised, "_TABICL_MAX_ROWS", 5)
         s = _session("loan_applications.csv", tmp_path)
         with pytest.raises(ValueError, match="up to ~5 rows"):

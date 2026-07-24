@@ -4,9 +4,10 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from tabint import mcp_server
-from tabint.connectors import contract, get_connector
-from tabint.connectors import stripe as stripe_conn
+from tabint.analysis import tools as mcp_server
+from tabint.integration.schemas import stripe as contract
+from tabint.integration.service.base import get_connector
+from tabint.integration.service import stripe as stripe_conn
 
 
 # ── canned Stripe objects ─────────────────────────────────────────────────
@@ -109,7 +110,8 @@ def test_connect_stripe_needs_credentials(monkeypatch):
 
 
 def test_connect_stripe_creates_session(monkeypatch, tmp_path, mocked_stripe):
-    monkeypatch.setattr(mcp_server, "_BASE", str(tmp_path))
+    from tabint.shared import server
+    monkeypatch.setattr(server, "_BASE", str(tmp_path))
     monkeypatch.setenv("STRIPE_API_KEY", "sk_test_x")
     out = mcp_server.connect_stripe(limit=100)
     assert "session_key" in out

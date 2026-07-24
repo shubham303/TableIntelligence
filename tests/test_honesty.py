@@ -5,10 +5,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from tabint import honesty
-from tabint._serialize import result_dict
-from tabint.honesty import TrustLevel
-from tabint.results import Result
+from tabint.shared import honesty
+from tabint.shared.serialize import result_dict
+from tabint.shared.honesty import TrustLevel
+from tabint.shared.results import Result
 
 
 class FakeStore:
@@ -64,7 +64,7 @@ def test_result_dict_surfaces_decline():
 
 # ── retrofit: compare_periods ─────────────────────────────────────────────
 def test_compare_periods_attaches_low_trust_on_small_sample():
-    from tabint.analytics.compare import compare_periods
+    from tabint.analysis.service.algorithms.compare import compare_periods
 
     df = pd.DataFrame(
         {
@@ -81,7 +81,7 @@ def test_compare_periods_attaches_low_trust_on_small_sample():
 
 # ── retrofit: causal_effect declines (no DoWhy needed — refuses first) ─────
 def test_causal_declines_on_too_few_rows():
-    from tabint.analytics.causal import causal_effect
+    from tabint.analysis.service.algorithms.causal import causal_effect
 
     df = pd.DataFrame({"tx": [0, 1] * 5, "y": np.arange(10.0), "c": np.arange(10.0)})
     res = causal_effect(FakeStore(df), treatment="tx", outcome="y", confounders=["c"])
@@ -91,7 +91,7 @@ def test_causal_declines_on_too_few_rows():
 
 
 def test_causal_declines_on_no_treatment_variation():
-    from tabint.analytics.causal import causal_effect
+    from tabint.analysis.service.algorithms.causal import causal_effect
 
     df = pd.DataFrame({"tx": [1] * 60, "y": np.arange(60.0), "c": np.arange(60.0)})
     res = causal_effect(FakeStore(df), treatment="tx", outcome="y", confounders=["c"])
