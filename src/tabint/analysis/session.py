@@ -35,7 +35,7 @@ class Session:
         """Load one or more CSVs into a new in-memory Session.
 
         This is the library entry point (no persistence). For addressable,
-        on-disk sessions the CLI/MCP layers use tabint.analysis.persistence instead.
+        on-disk sessions the CLI/MCP layers use tabint.analysis.db.persistence instead.
 
         Args:
             paths: A single CSV path, or a list of paths to load as related tables.

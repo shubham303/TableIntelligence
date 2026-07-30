@@ -16,7 +16,7 @@ import os
 
 from mcp.server.fastmcp import FastMCP
 
-from tabint.analysis import persistence
+from tabint.analysis.db import persistence
 from tabint.analysis.session import Session
 
 _INSTRUCTIONS = """Deterministic single-table data analysis. Workflow:

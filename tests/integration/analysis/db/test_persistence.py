@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from tabint.analysis import persistence
+from tabint.analysis.db import persistence
 from tests.unit.factory import numeric_frame
 
 

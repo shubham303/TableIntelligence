@@ -27,8 +27,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .session import Session
-from .service.workspace import Workspace
+from ..session import Session
+from ..service.workspace import Workspace
 
 _SESSIONS_SUBDIR = Path(".tableint") / "sessions"
 

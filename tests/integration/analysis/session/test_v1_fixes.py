@@ -8,7 +8,7 @@ Mirrors: src/tabint/analysis/session.py (regression coverage).
 """
 import pandas as pd
 
-from tabint.analysis import persistence
+from tabint.analysis.db import persistence
 from tests.unit.factory import numeric_frame
 
 

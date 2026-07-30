@@ -57,7 +57,7 @@ def test_session_id_is_sanitized_no_traversal():
 def test_scratchpad_lives_outside_session_dir(tmp_path):
     # The file must NOT be inside a session directory, so deleting the session
     # (which removes <base>/.tableint/sessions/<id>/) never touches the notes.
-    from tabint.analysis import persistence
+    from tabint.analysis.db import persistence
 
     session_dir = persistence.session_dir("s_x", base=tmp_path)
     pad = scratchpad._path("s_x")

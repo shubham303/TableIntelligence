@@ -1,7 +1,7 @@
 """Command-line surface — lets a terminal agent (e.g. Claude Code) drive the core.
 
 Every command prints a JSON object to stdout so an agent can parse the result.
-State lives in on-disk sessions (see tabint.analysis.persistence): ``tabint load`` mints a
+State lives in on-disk sessions (see tabint.analysis.db.persistence): ``tabint load`` mints a
 session key; pass ``--session <key>`` to every later command to keep working on the
 same data. Analytics operate on ONE table (``--table``) — an uploaded table or one
 produced by ``tabint join``.
@@ -22,7 +22,7 @@ import json
 import sys
 from typing import Any
 
-from tabint.analysis import persistence
+from tabint.analysis.db import persistence
 from tabint.shared import scratchpad
 from tabint.shared.serialize import jsonable, result_dict
 

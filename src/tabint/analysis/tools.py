@@ -10,7 +10,7 @@ import os
 
 from tabint.integration.service import entitlement
 from tabint.integration import list_connectors as _list_connectors, get_connector
-from tabint.analysis import persistence
+from tabint.analysis.db import persistence
 from tabint.analysis.service.validation.dtypes import classify_column, SETTABLE_TYPES
 from tabint.shared import scratchpad
 from tabint.shared.serialize import jsonable as _jsonable, result_dict as _result
