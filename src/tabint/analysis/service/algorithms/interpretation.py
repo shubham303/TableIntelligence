@@ -123,7 +123,8 @@ def explain_prediction(model: Any, row: Any) -> Result:
         base = base[cls] if np.ndim(base) else base
 
     contributions = _aggregate_to_columns(
-        pre, values, model._numeric_features, model._categorical_features
+        pre, values,
+        model._numeric_features, model._nominal_features, model._ordinal_features,
     )
     ranked = dict(sorted(contributions.items(), key=lambda kv: abs(kv[1]), reverse=True))
 
@@ -148,7 +149,8 @@ def _aggregate_to_columns(
     pre: Any,
     values: np.ndarray,
     numeric: list[str],
-    categorical: list[str],
+    nominal: list[str],
+    ordinal: list[str],
 ) -> dict[str, float]:
     """Sum encoded-feature SHAP values back onto their original source columns.
 
@@ -156,18 +158,30 @@ def _aggregate_to_columns(
     concatenated feature-name strings (which mis-attributes when a column name
     plus a category value collides with another column, e.g. 'a' vs 'a_b').
 
-    The transformed layout is: the numeric block (one output per numeric column,
-    in order) followed by the categorical block (one-hot, len(categories_[i])
-    outputs per categorical column, in order) — matching build_preprocessor.
+    The transformed layout, matching build_preprocessor, is three blocks in
+    order: numeric (one output per column), ordinal (one output per column,
+    integer-encoded), nominal (one-hot, len(categories_[i]) outputs per column).
+    A block that was empty at fit time is absent from the transformer, so the
+    walk keys off the transformer's named branches rather than assuming all
+    three are present.
     """
-    totals = {col: 0.0 for col in numeric + categorical}
+    totals = {col: 0.0 for col in numeric + nominal + ordinal}
     idx = 0
-    for col in numeric:
-        totals[col] += float(values[idx])
-        idx += 1
-    if categorical:
-        ohe = pre.named_transformers_["categorical"].named_steps["onehot"]
-        for i, col in enumerate(categorical):
+    branches = pre.named_transformers_
+    # Numeric block: one SHAP value per numeric column, in order.
+    if numeric and "numeric" in branches:
+        for col in numeric:
+            totals[col] += float(values[idx])
+            idx += 1
+    # Ordinal block: one SHAP value per ordinal column (integer-encoded → 1 out).
+    if ordinal and "ordinal" in branches:
+        for col in ordinal:
+            totals[col] += float(values[idx])
+            idx += 1
+    # Nominal block: one-hot, len(categories_[i]) outputs per nominal column.
+    if nominal and "nominal" in branches:
+        ohe = branches["nominal"].named_steps["onehot"]
+        for i, col in enumerate(nominal):
             for _ in range(len(ohe.categories_[i])):
                 totals[col] += float(values[idx])
                 idx += 1

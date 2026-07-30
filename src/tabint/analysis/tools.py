@@ -10,7 +10,8 @@ import os
 
 from tabint.integration.service import entitlement
 from tabint.integration import list_connectors as _list_connectors, get_connector
-from tabint.analysis.db import persistence
+from tabint.analysis import persistence
+from tabint.analysis.service.validation.dtypes import classify_column, SETTABLE_TYPES
 from tabint.shared import scratchpad
 from tabint.shared.serialize import jsonable as _jsonable, result_dict as _result
 from tabint.shared.results import Result
@@ -54,7 +55,7 @@ def account_status() -> dict:
     """Show the linked account's subscription tier (free/pro) against the Table
     Intelligence platform. The MCP server itself is free to use and imposes no
     client-side gating; subscription status is enforced server-side by the API
-    (e.g. persisting outreach/reports to the dashboard). This is informational."""
+    (e.g. persisting reports to the dashboard). This is informational."""
     return entitlement.status()
 
 
@@ -258,6 +259,83 @@ def count_non_null(session_key: str, table: str, column: str) -> dict:
         "n_rows": n_rows,
         "n_null": n_rows - n_non_null,
     }
+
+
+@mcp.tool()
+def list_categorical_columns(session_key: str, table: str) -> dict:
+    """Return the categorical columns that still need a type assignment.
+
+    A worklist, not a full listing: a column appears here only while its type is
+    still the auto-detected coarse label ``categorical``. Once you refine it with
+    set_column_type (to categorical_nominal or categorical_ordinal) it drops off
+    this list. An empty ``unclassified`` means every categorical column is typed
+    and the table is ready for modeling. Each entry includes the distinct value
+    count and a small sample of the values to help you judge whether the levels
+    are ordered (ordinal) or not (nominal).
+    """
+    t = _get(session_key).table(table)
+    frame = t.get_frame()
+    out = []
+    for col in t._table.schema().names:
+        # classify_column is cache-and-compute: this call also caches the type,
+        # so every column ends up typed after a pass through this tool.
+        if classify_column(col, t) == "categorical":
+            series = frame[col].dropna()
+            distinct = int(series.nunique())
+            sample = [str(v) for v in series.unique()[:10]]
+            out.append({"column": col, "distinct": distinct, "sample": sample})
+    return {"table": table, "unclassified": out, "n": len(out)}
+
+
+@mcp.tool()
+def set_column_type(session_key: str, table: str, column: str, type: str) -> dict:
+    """Assign a refined categorical type to a column.
+
+    The only accepted values are ``categorical_nominal`` (unordered categories:
+    color, city, payment method) and ``categorical_ordinal`` (ordered categories
+    with no meaningful spacing: satisfaction, education level, size S/M/L).
+    continuous / datetime / identifier are auto-detected facts about the data and
+    cannot be set here. The assignment persists with the session and feeds every
+    later operation: ordinal columns are integer-encoded at modeling time rather
+    than one-hot encoded, and modeling refuses to run until every categorical
+    column is refined.
+    """
+    if type not in SETTABLE_TYPES:
+        raise ValueError(
+            f"set_column_type accepts only {sorted(SETTABLE_TYPES)}; got {type!r}. "
+            "(continuous/datetime/identifier are auto-detected, not settable.)"
+        )
+    t = _get(session_key).table(table)
+    t.set_column_type(column, type)
+    return {"table": table, "column": column, "type": type}
+
+
+@mcp.tool()
+def unset_column_type(session_key: str, table: str, column: str) -> dict:
+    """Clear a column's assigned type so it is re-detected on next use.
+
+    Useful to correct a mistake: after unsetting, the column returns to the
+    auto-detected coarse label and re-appears on the list_categorical_columns
+    worklist. The next classify_column call recomputes and re-caches its type.
+    """
+    t = _get(session_key).table(table)
+    t.unset_column_type(column)
+    return {"table": table, "column": column, "cleared": True}
+
+
+@mcp.tool()
+def classify_as_nominal(session_key: str, table: str) -> dict:
+    """Refine every unclassified categorical column on the table to nominal.
+
+    A batch convenience over set_column_type: assigns categorical_nominal to
+    every column still at the coarse ``categorical`` label in one call. Typical
+    workflow — call this first to unblock modeling, then selectively refine the
+    genuinely-ordered columns (satisfaction, size, rating) to categorical_ordinal
+    with set_column_type. Returns the list of columns it refined.
+    """
+    t = _get(session_key).table(table)
+    refined = t.classify_categorical_as_nominal()
+    return {"table": table, "refined": refined, "n": len(refined)}
 
 
 @mcp.tool()

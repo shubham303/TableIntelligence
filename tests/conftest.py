@@ -65,9 +65,27 @@ def load_session(name: str, tmp_path: Path):
 
     Replaces ``_session("employees.csv", tmp_path)`` in test_analytics /
     test_feature_computation.
+
+    Stands in for the LLM classification step required before modeling: every
+    categorical column is refined to categorical_nominal so downstream model/
+    cluster/association calls don't hit the unclassified-column error. Tests that
+    exercise the ordinal path set those columns explicitly afterward.
     """
     from tabint import Session
-    return Session.load(str(copy_fixture(name, tmp_path)))
+    s = Session.load(str(copy_fixture(name, tmp_path)))
+    classify_all_nominal(s)
+    return s
+
+
+def classify_all_nominal(session) -> None:
+    """Mock the LLM: refine every categorical column in every table to nominal.
+
+    Production forces an agent to call list_categorical_columns + set_column_type
+    before modeling. Tests don't run an agent, so this helper applies the safe
+    default (nominal) to all categorical columns of all tables in the session.
+    """
+    for name in session.tables:
+        session.table(name).classify_categorical_as_nominal()
 
 
 @pytest.fixture
@@ -82,11 +100,14 @@ def session_loader(tmp_path):
 def linked_session(tmp_path):
     """A multi-table Session: orders → customers + orders → products.
 
-    Promoted from test_workspace.py's ``linked`` fixture.
+    Promoted from test_workspace.py's ``linked`` fixture. Applies the nominal
+    mock classification to every table (see load_session).
     """
     from tabint import Session
     paths = copy_fixtures(tmp_path, "orders.csv", "customers.csv", "products.csv")
-    return Session.load(paths)
+    s = Session.load(paths)
+    classify_all_nominal(s)
+    return s
 
 
 # ── CLI runner (the old _run) ──────────────────────────────────────────────

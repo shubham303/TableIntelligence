@@ -120,7 +120,8 @@ def profile_clusters(store: Any) -> Result:
     if _LABEL_COLUMN not in frame.columns:
         raise ValueError("No cluster labels found — call cluster() first.")
 
-    numeric, categorical = _prep.feature_columns(store, exclude=(_LABEL_COLUMN,))
+    numeric, nominal, ordinal = _prep.feature_columns(store, exclude=(_LABEL_COLUMN,))
+    categorical = nominal + ordinal
     profiles: dict[int, Any] = {}
 
     for cid, group in frame.groupby(_LABEL_COLUMN, observed=True):

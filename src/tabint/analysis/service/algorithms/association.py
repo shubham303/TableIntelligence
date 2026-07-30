@@ -51,10 +51,22 @@ _CONTINUOUS = {"continuous"}
 
 
 def _kind(col_name: str, store: Any) -> str:
-    """Collapse the fine dtype into 'continuous' or 'categorical' for routing."""
+    """Collapse the fine dtype into 'continuous' or 'categorical' for routing.
+
+    Raises ValueError if the column is still at the unrefined ``categorical``
+    label — association (like all modeling) requires the column to be refined to
+    nominal or ordinal first, via set_column_type. datetime / identifier are not
+    testable for association at all.
+    """
     t = dtypes.classify_column(col_name, store)
     if t in _CONTINUOUS:
         return "continuous"
+    if t == "categorical":
+        raise ValueError(
+            f"Column {col_name!r} is unclassified (type 'categorical'); call "
+            "list_categorical_columns then set_column_type (to categorical_nominal "
+            "or categorical_ordinal) before analyzing its association."
+        )
     if t in _CATEGORICAL:
         return "categorical"
     # datetime / identifier are not meaningfully testable for association.

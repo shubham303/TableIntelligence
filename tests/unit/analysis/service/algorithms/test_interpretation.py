@@ -21,9 +21,9 @@ def test_shap_aggregation_no_prefix_collision():
     df = pd.DataFrame({"a": ["b", "c", "b", "c"], "a_b": ["x", "y", "x", "y"]})
     cat = Pipeline([("impute", SimpleImputer(strategy="most_frequent")),
                     ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False))])
-    pre = ColumnTransformer([("categorical", cat, ["a", "a_b"])], remainder="drop").fit(df)
+    pre = ColumnTransformer([("nominal", cat, ["a", "a_b"])], remainder="drop").fit(df)
     names = list(pre.get_feature_names_out())
     vals = np.arange(1, len(names) + 1, dtype=float)
-    totals = _aggregate_to_columns(pre, vals, [], ["a", "a_b"])
+    totals = _aggregate_to_columns(pre, vals, [], ["a", "a_b"], [])
     # a -> categories b,c = 1+2 = 3 ; a_b -> x,y = 3+4 = 7
     assert totals == {"a": 3.0, "a_b": 7.0}

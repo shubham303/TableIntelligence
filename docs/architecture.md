@@ -52,17 +52,17 @@ The split is driven by **estimated cost** (≈ rows × features × an algorithm
 factor), not a static per-algorithm label — the same k-means is instant on 10k rows
 and a job on 50M.
 
-## Package layout (feature-oriented)
-`src/tabint/` is organized into vertical slices. Each feature owns its endpoints
-(MCP tools) and service logic; features depend only on `integration/` + `shared/`,
-never on each other's internals. The composition root (`app/`) wires the features
-onto a single FastMCP server and exposes the CLI.
+## Package layout
+`src/tabint/` is organized as vertical slices. The `analysis` feature owns its
+endpoints (MCP tools) and service logic; it depends only on `integration/` +
+`shared/`. The composition root (`app/`) wires `analysis` onto a single FastMCP
+server and exposes the CLI.
 
 ```
 src/tabint/
 ├── __init__.py            public API (Session, Result, Workspace, Table, …)
 ├── app/                   composition root — entry points
-│   ├── mcp_server.py      slim registration root: imports feature tools modules, main()
+│   ├── mcp_server.py      slim registration root: imports analysis.tools, main()
 │   └── cli.py             argparse CLI (JSON-per-command), delegates to the core
 ├── analysis/              FEATURE: data analysis
 │   ├── tools.py           ~30 MCP tool defs (session lifecycle, structure, analytics)
@@ -77,14 +77,10 @@ src/tabint/
 │   └── db/
 │       ├── ducktable.py   DuckDB write mechanics (_ti_row id, ordered read/write)
 │       └── persistence.py on-disk sessions (data.duckdb + models/ + meta.json)
-├── outreach/              FEATURE: outreach agent
-│   ├── tools.py           ~15 MCP tools (templates/campaigns/emails/reports CRUD)
-│   └── prompts.py         the outreach-agent prompt (loaded once as a playbook)
-├── integration/           ALL external API clients
+├── integration/           external API clients (entitlement + Stripe)
 │   ├── schemas/stripe.py  canonical Stripe table shapes (normalization contract)
 │   └── service/
 │       ├── base.py        Connector ABC + registry
-│       ├── platform.py    control-plane client (reports + outreach), x-api-key
 │       ├── entitlement.py key-validation client (free/pro, fail-open)
 │       └── stripe.py      Stripe REST connector
 └── shared/                generic cross-cutting code

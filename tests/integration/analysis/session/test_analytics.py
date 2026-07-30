@@ -93,7 +93,9 @@ class TestAssociation:
             w = csv.writer(f)
             w.writerow(["grp", "val"])
             w.writerows([["A", v] for v in g1] + [["B", v] for v in g2])
-        r = Session.load(str(p)).analyze_association("grp", "val")
+        s = Session.load(str(p))
+        s.classify_categorical_as_nominal()  # mock the LLM step (grp is categorical)
+        r = s.analyze_association("grp", "val")
         assert r.method == "welch_t_test"
         assert r.metadata["assumption_checks"]["equal_variance"] is False
         assert r.metadata["assumption_checks"]["parametric"] is True

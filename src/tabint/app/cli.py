@@ -1,7 +1,7 @@
 """Command-line surface — lets a terminal agent (e.g. Claude Code) drive the core.
 
 Every command prints a JSON object to stdout so an agent can parse the result.
-State lives in on-disk sessions (see tabint.analysis.db.persistence): ``tabint load`` mints a
+State lives in on-disk sessions (see tabint.analysis.persistence): ``tabint load`` mints a
 session key; pass ``--session <key>`` to every later command to keep working on the
 same data. Analytics operate on ONE table (``--table``) — an uploaded table or one
 produced by ``tabint join``.
@@ -22,7 +22,7 @@ import json
 import sys
 from typing import Any
 
-from tabint.analysis.db import persistence
+from tabint.analysis import persistence
 from tabint.shared import scratchpad
 from tabint.shared.serialize import jsonable, result_dict
 
@@ -269,6 +269,20 @@ def _cmd_compare_periods(args) -> dict:
     return result_dict(_open(args).table(args.table).compare_periods(args.time, args.value, args.split))
 
 
+def _cmd_classify_as_nominal(args) -> dict:
+    # Mock the agent step: refine every unclassified categorical column on the
+    # table to categorical_nominal, so downstream modeling can run.
+    t = _open(args).table(args.table)
+    refined = t.classify_categorical_as_nominal()
+    return {"table": args.table, "refined": refined, "n": len(refined)}
+
+
+def _cmd_set_column_type(args) -> dict:
+    t = _open(args).table(args.table)
+    t.set_column_type(args.column, args.type)
+    return {"table": args.table, "column": args.column, "type": args.type}
+
+
 # --------------------------------------------------------------------------- #
 # parser
 # --------------------------------------------------------------------------- #
@@ -501,6 +515,17 @@ def _build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--value", required=True)
     sp.add_argument("--split", default=None, help="ISO date to split on (default: median timestamp).")
     sp.set_defaults(func=_cmd_compare_periods)
+
+    with_table(with_session(sub.add_parser(
+        "classify-as-nominal",
+        help="Refine every unclassified categorical column to categorical_nominal."))).set_defaults(
+        func=_cmd_classify_as_nominal)
+
+    sp = with_table(with_session(sub.add_parser(
+        "set-column-type", help="Assign a refined categorical type to a column.")))
+    sp.add_argument("column")
+    sp.add_argument("type", help="categorical_nominal or categorical_ordinal")
+    sp.set_defaults(func=_cmd_set_column_type)
 
     return p
 

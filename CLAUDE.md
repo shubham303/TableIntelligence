@@ -1,70 +1,65 @@
 # Table Intelligence
 
-Table Intelligence is a **suite of AI agents** (data analysis, outreach, and more) delivered as a
-single MCP server that plugs into Claude and other AI agents, backed by a web platform for
-accounts, billing, and a dashboard.
+Table Intelligence is a **deterministic, reproducible intelligence layer for single-table
+data**, delivered as a single MCP server (package `tabint`) that plugs into Claude and other
+AI agents. It runs locally on the user's machine via DuckDB — that is the core privacy
+property: **the user's raw data never leaves their machine.**
 
-## Architecture — two parts
+## Architecture — the MCP server
 
-The project has **two parts** that live in two repos:
-
-1. **The MCP server** (this repo, `TableIntelligence`) — a local Python MCP server (package
-   `tabint`). It only exposes **prompts, resources, and tools**. It holds no user account data of
-   its own; for anything that needs to be stored, it **calls the web platform's HTTP APIs** to do
-   CRUD on that data.
-
-2. **The web platform + APIs** (sibling repo `shubham-site`, Astro on Vercel + Supabase Postgres) —
-   user accounts, auth, subscriptions/billing, the dashboard, and the **REST APIs** the MCP server
-   calls. It stores only **dashboard-relevant data and the output of the various agents** (e.g.
-   saved analysis reports; outreach templates, campaigns, prospects, drafted emails, received
-   emails).
-
-### How they fit together
-
-- **Data-analysis tools live in the MCP server and run locally on the user's machine** (via DuckDB
-  / the `tabint` engine). This is the core privacy property: **the user's raw data never leaves
-  their machine.** Only the outputs the user chooses to save (e.g. a report, an outreach draft) are
-  sent to the platform.
-- **The MCP server calls the platform APIs** (authenticated with the user's API key,
-  `TABINT_API_KEY`) to create/read/update/delete that dashboard data.
-- **The web frontend calls the same APIs** (authenticated by the login session) to display and edit
-  that data. So both the MCP server and the dashboard read/write the same records through one API
-  layer.
+This repo is the MCP server (`package `tabint`, src layout). It exposes **prompts,
+resources, and tools** for one capability: **local tabular data analysis** (descriptive →
+diagnostic → predictive → causal). There is no account data, no dashboard, and no
+multi-agent orchestration here — it is one analysis server.
 
 ```
-User's machine                              Cloud (shubham-site)
-┌───────────────────────────┐               ┌──────────────────────────────┐
-│ AI agent (Claude, …)      │   HTTP APIs   │ Web platform (Astro/Vercel)  │
-│  └─ MCP server (tabint)   │──────────────▶│  ├─ REST APIs (/api/*)       │
-│      ├─ analysis tools    │  (API key)    │  ├─ Dashboard (session)      │
-│      │   run LOCALLY      │               │  └─ Supabase Postgres        │
-│      └─ calls APIs to     │◀──────────────│      (accounts + agent       │
-│         store outputs     │   data        │       outputs only)          │
-│  raw data stays here ─────┘               └──────────────────────────────┘
+User's machine
+┌───────────────────────────────────────────┐
+│ AI agent (Claude, Codex, …)               │
+│  └─ MCP server (tabint)                   │
+│      └─ analysis tools run LOCALLY (DuckDB)│
+│  raw data stays here ─────────────────────┘
+└───────────────────────────────────────────┘
 ```
 
-## Repos
+### What it does NOT do
 
-- **`TableIntelligence`** (this repo) — the MCP server. Python package `tabint` (src layout). The
-  analytics engine + the outreach connector tools. The MCP holds no DB; `src/tabint/platform.py` is
-  its HTTP client to the platform APIs.
-- **`shubham-site`** (sibling, `../shubham-site`) — the web platform: Astro SSR on Vercel, **Neon
-  Postgres** via `DATABASE_URL`. Backend is feature-sliced under `src/server/features/<feature>/`
-  (model → repository → service); auth + billing are owned by BetterAuth + better-auth-razorpay.
-  See `shubham-site/NEON.md` for the database setup.
+- It does not send the user's raw data off-machine.
+- It does not own or talk to the user's other systems (GitHub, deploy, CMS, email).
+  Those write/exec tools belong to the host AI harness, not to `tabint`.
+
+### The optional platform coupling (entitlement + Stripe)
+
+Two small integrations reach out over HTTP, both **opt-in and informational**:
+
+- **`entitlement`** (`tabint.integration.service.entitlement`) — looks up the user's
+  subscription tier (`free`/`pro`) against a Table Intelligence web platform via
+  `POST /api/validate-key`, authenticated with the user's `TABINT_API_KEY` in the
+  `x-api-key` header. Feeds the informational `account_status` tool. The MCP server itself
+  is free to use and imposes no client-side gating; the tier is reported, never enforced
+  locally.
+- **Stripe connector** (`tabint.integration.service.stripe`) — used by the
+  `connect_stripe` / `list_connectors` tools and the `stripe()` prompt to fetch and
+  materialize a connected Stripe account's canonical tables (locally, via DuckDB) for
+  analysis.
+
+The web platform that backs `entitlement` lives in a sibling repo (`shubham-site`,
+Astro/Vercel + Neon Postgres). It is **not** required to run the MCP server — if
+`TABINT_API_KEY` is unset, entitlement simply fails open to `free`.
 
 ## Conventions
 
-- The MCP is **local-first**: never send the user's raw dataset to the platform; only send outputs
-  the user explicitly saves.
-- All persisted data goes through the platform APIs — the MCP server never talks to a database
-  directly.
-- Analytics tools are free; the whole MCP server is free to use with no client-side gating.
-  The Pro tier (persisting outreach/reports to the dashboard) is enforced server-side on the
-  API by subscription only. The `entitlement` module is informational (feeds `account_status`).
-- **Auth/entitlement model**: two roles — `free` and `pro`. The MCP sends the user's API key in the
-  `x-api-key` header on every platform call and validates it via `POST /api/validate-key`, which
-  returns `{ role, trial_until }`. Roles are derived server-side from the
-  [better-auth-razorpay](https://github.com/iamjasonkendrick/better-auth-razorpay) subscription
-  table (active or within-trial => pro). The `control-plane/` Python package (local DuckDB
-  replacement for Neon) has been removed — Neon is the sole source of truth.
+- The MCP is **local-first**: never send the user's raw dataset anywhere; the analysis
+  runs in-process on DuckDB.
+- Analytics tools are free; there is no client-side gating. The Pro tier (if a platform is
+  connected) is enforced server-side on the platform API, not here.
+- The `entitlement` module is informational only — it feeds `account_status`.
+
+## Repos
+
+- **`TableIntelligence`** (this repo) — the MCP server. Python package `tabint` (src
+  layout). The analytics engine (`analysis/`) + the small `integration/` package
+  (entitlement + the Stripe connector).
+- **`shubham-site`** (sibling, `../shubham-site`) — the web platform, when one is
+  connected: Astro SSR on Vercel, Neon Postgres via `DATABASE_URL`. See
+  `shubham-site/NEON.md` for its database setup.

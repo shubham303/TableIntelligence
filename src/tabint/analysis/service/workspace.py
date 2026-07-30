@@ -145,7 +145,12 @@ class Table:
         skipped by feature_columns so they never leak into a feature matrix. Pass
         ``feature=True`` for derived columns that ARE meant to be features (e.g. the
         components from reduce_dimensions, to cluster/train on afterwards).
+
+        If the column already existed, its cached type is cleared so the next
+        classify_column recomputes it — the data has changed, so the old type may
+        no longer be right.
         """
+        self._invalidate_column_type_if_exists(name)
         _ducktable.write_back(self._ws._ibis, self._internal, self._view, name, values)
         self._table = self._ws._ibis.table(self._view)
         if feature:
@@ -161,7 +166,10 @@ class Table:
         validated to be a single scalar over the table's columns. Returns the count
         of non-null values. ``feature`` controls registry membership exactly like
         write_back_column (default True = a real, model-eligible feature).
+
+        If the column already existed, its cached type is cleared (see write_back_column).
         """
+        self._invalidate_column_type_if_exists(name)
         n = _ducktable.add_computed_column(self._ws._ibis, self._internal, self._view, name, expression)
         self._table = self._ws._ibis.table(self._view)
         if feature:
@@ -173,6 +181,94 @@ class Table:
     def derived_columns(self) -> set[str]:
         """Names of this table's derived (non-feature) columns; see write_back_column."""
         return _ducktable.derived_columns(self._ws._ibis, self.name)
+
+    # --- column-type cache (the sidecar type store) ---------------------- #
+    #
+    # Two layers over _ducktable's _ti_column_types table:
+    #   * the *_cached_* accessors are unvalidated — the cache reads/writes that
+    #     dtypes.classify_column (cache-and-compute) uses for ANY type, including
+    #     auto-detected continuous/datetime/identifier.
+    #   * set_column_type is the validated, agent-facing method: it accepts only
+    #     categorical_nominal / categorical_ordinal (the refinements) and rejects
+    #     everything else, then writes through to the same cache.
+
+    def get_cached_type(self, column: str) -> str | None:
+        """Cached type for one column, or None if it has not been classified yet."""
+        return _ducktable.get_column_type(self._ws._ibis, self.name, column)
+
+    def set_cached_type(self, column: str, type_value: str) -> None:
+        """Write a type into the cache directly (no validation). Internal use by
+        classify_column — accepts any value in COLUMN_TYPES."""
+        _ducktable.set_column_type(self._ws._ibis, self.name, column, type_value)
+
+    def unset_cached_type(self, column: str) -> None:
+        """Clear a column's cached type so the next classify_column recomputes it."""
+        _ducktable.unset_column_type(self._ws._ibis, self.name, column)
+
+    def get_column_type(self, column: str) -> str | None:
+        """Cached type for one column (alias of get_cached_type)."""
+        return self.get_cached_type(column)
+
+    def set_column_type(self, column: str, type_value: str) -> None:
+        """Set a column's type to a refined categorical value (agent-facing).
+
+        Only ``categorical_nominal`` / ``categorical_ordinal`` are accepted — the
+        two refinements of the auto-detected ``categorical`` label. Continuous /
+        datetime / identifier are auto-detected facts about the data and cannot be
+        overridden here; to change those, transform the column. Raises ValueError
+        for an unknown type or a column that does not exist.
+        """
+        from .validation.dtypes import SETTABLE_TYPES as _SETTABLE_TYPES
+        if type_value not in _SETTABLE_TYPES:
+            raise ValueError(
+                f"set_column_type accepts only {sorted(_SETTABLE_TYPES)}; "
+                f"got {type_value!r}. (continuous/datetime/identifier are auto-detected.)"
+            )
+        self._require_column(column)
+        _ducktable.set_column_type(self._ws._ibis, self.name, column, type_value)
+
+    def unset_column_type(self, column: str) -> None:
+        """Clear a column's assigned type so it is re-detected on next use."""
+        _ducktable.unset_column_type(self._ws._ibis, self.name, column)
+
+    def column_types(self) -> dict[str, str]:
+        """All cached types for this table as {column: type}."""
+        return _ducktable.column_types(self._ws._ibis, self.name)
+
+    def classify_categorical_as_nominal(self) -> list[str]:
+        """Refine every still-unclassified categorical column to nominal.
+
+        A batch default: walks the columns, and for each one whose type is the
+        auto-detected coarse ``categorical`` label, sets it to
+        ``categorical_nominal``. Returns the names of the columns it refined.
+        Useful as a starting point (an agent defaults everything to nominal, then
+        refines the genuinely-ordered ones to ordinal) and as the mock an LLM
+        would perform in tests. Already-refined columns are left untouched.
+        """
+        from .validation.dtypes import classify_column as _classify
+        refined: list[str] = []
+        for col in self._table.schema().names:
+            if _classify(col, self) == "categorical":
+                _ducktable.set_column_type(self._ws._ibis, self.name, col, "categorical_nominal")
+                refined.append(col)
+        return refined
+
+    def _require_column(self, column: str) -> None:
+        if column not in self._table.schema().names:
+            raise KeyError(
+                f"No column {column!r} in table {self.name!r}. "
+                f"Known: {list(self._table.schema().names)}"
+            )
+
+    def _invalidate_column_type_if_exists(self, name: str) -> None:
+        """Clear the cached type when a column is about to be overwritten.
+
+        Called from the write paths: overwriting a column changes its data, so any
+        previously-cached type (auto or agent-set) may be stale. A genuinely new
+        column has no cached entry, so the unset is a no-op for it.
+        """
+        if name in self._table.schema().names:
+            _ducktable.unset_column_type(self._ws._ibis, self.name, name)
 
     # --- descriptive ------------------------------------------------------ #
 

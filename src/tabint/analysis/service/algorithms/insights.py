@@ -52,7 +52,8 @@ def explain_metric(store: Any, target: str, max_depth: int = _MAX_DEPTH) -> Resu
     if target not in frame.columns:
         raise ValueError(f"Target column {target!r} not in table.")
 
-    numeric, categorical = _prep.feature_columns(store, exclude=(target,))
+    numeric, nominal, ordinal = _prep.feature_columns(store, exclude=(target,))
+    categorical = nominal + ordinal
     features = numeric + categorical
     if not features:
         raise ValueError("No usable feature columns to explain the metric with.")

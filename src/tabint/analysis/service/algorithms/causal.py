@@ -67,8 +67,8 @@ def causal_effect(
             raise ValueError(f"Column {col!r} not in table.")
 
     if confounders is None:
-        numeric, categorical = _prep.feature_columns(store, exclude=(treatment, outcome))
-        confounders = numeric + categorical
+        numeric, nominal, ordinal = _prep.feature_columns(store, exclude=(treatment, outcome))
+        confounders = numeric + nominal + ordinal
     else:
         missing = [c for c in confounders if c not in frame.columns]
         if missing:

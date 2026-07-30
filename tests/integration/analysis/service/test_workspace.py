@@ -102,6 +102,7 @@ def test_join_columns_disambiguated(linked_session):
 
 def test_analytics_run_on_joined_table(linked_session):
     joined = linked_session.join(["orders", "customers", "products"], name="enriched")
+    joined.classify_categorical_as_nominal()  # mock the LLM step (tier is categorical)
     # a single-table operation on a joined table
     r = joined.analyze_association("order_total", "tier")
     assert r.method in {"welch_t_test", "anova", "mann_whitney", "kruskal_wallis"}
@@ -164,16 +165,16 @@ def test_derived_columns_excluded_from_features(linked_session):
     from tabint.analysis.service import _prep
 
     orders = linked_session.table("orders")
-    before_num, before_cat = _prep.feature_columns(orders)
+    before_num, before_nom, before_ord = _prep.feature_columns(orders)
 
     # A written-back annotation column must be recorded as derived...
     orders.write_back_column("flagged", [True] * len(orders.get_frame()))
     assert "flagged" in orders.derived_columns()
 
     # ...and therefore never appear as a feature.
-    after_num, after_cat = _prep.feature_columns(orders)
-    assert "flagged" not in after_num + after_cat
-    assert (after_num, after_cat) == (before_num, before_cat)
+    after_num, after_nom, after_ord = _prep.feature_columns(orders)
+    assert "flagged" not in after_num + after_nom + after_ord
+    assert (after_num, after_nom, after_ord) == (before_num, before_nom, before_ord)
 
 
 def test_write_back_feature_true_stays_a_feature(linked_session):
@@ -183,7 +184,7 @@ def test_write_back_feature_true_stays_a_feature(linked_session):
     n = len(orders.get_frame())
     orders.write_back_column("component_0", [i * 0.1 for i in range(n)], feature=True)
     assert "component_0" not in orders.derived_columns()
-    num, cat = _prep.feature_columns(orders)
+    num, nominal, ordinal = _prep.feature_columns(orders)
     assert "component_0" in num
 
 
@@ -204,6 +205,7 @@ def test_derived_registry_survives_reopen(tmp_path):
     reopened = Workspace(db_path=db)
     rt = reopened.table("orders")
     assert "anomaly" in rt.derived_columns()
-    num, cat = _prep.feature_columns(rt)
-    assert "anomaly" not in num + cat
+    rt.classify_categorical_as_nominal()  # mock the LLM classification step
+    num, nominal, ordinal = _prep.feature_columns(rt)
+    assert "anomaly" not in num + nominal + ordinal
     reopened.close()

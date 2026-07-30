@@ -48,7 +48,7 @@ Set these in the MCP server's `env` (or your shell for the CLI).
 
 | Variable | Required | Default | Purpose |
 | --- | --- | --- | --- |
-| `TABINT_API_KEY` | **yes** | — | Your key, from `https://shubhamrandive.com/dashboard/account`. Absent → free tier: all analytics still work, but paid connectors / cloud reports / outreach are gated. |
+| `TABINT_API_KEY` | **yes** | — | Your key, from `https://shubhamrandive.com/dashboard/account`. Absent → free tier: all analytics still work, but paid connectors / cloud reports are gated. |
 | `TABINT_CONTROL_PLANE_URL` | no | `https://shubhamrandive.com` | Base URL of the control plane (report/folder storage, key validation). |
 | `TABULAR_BASE` | no | current dir | Where on-disk sessions live (`<base>/.tableint/sessions/<key>/`). |
 

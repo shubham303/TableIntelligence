@@ -7,7 +7,7 @@ from tabint.analysis.session import Session
 from tabint.shared.results import Result
 from tabint.analysis.service.workspace import Workspace, Table
 from tabint.analysis.service.relationships import RelationshipGraph, Relationship
-from tabint.analysis.db import persistence
+from tabint.analysis import persistence
 
 __all__ = [
     "Session", "Result", "Workspace", "Table",

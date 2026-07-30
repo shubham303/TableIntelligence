@@ -1,0 +1,12 @@
+[mcp_servers.neon]
+command = "npx"
+args = [
+    "-y",
+    "@neondatabase/mcp-server-neon",
+]
+
+[mcp_servers.resend]
+url = "https://mcp.resend.com/mcp"
+
+[mcp_servers.tabular]
+command = "tabular-mcp"

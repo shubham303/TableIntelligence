@@ -35,7 +35,7 @@ class Session:
         """Load one or more CSVs into a new in-memory Session.
 
         This is the library entry point (no persistence). For addressable,
-        on-disk sessions the CLI/MCP layers use tabint.analysis.db.persistence instead.
+        on-disk sessions the CLI/MCP layers use tabint.analysis.persistence instead.
 
         Args:
             paths: A single CSV path, or a list of paths to load as related tables.
@@ -236,6 +236,16 @@ class Session:
     def models(self) -> dict[str, Any]:
         """Model registry of the sole table (single-table sessions)."""
         return self._sole().models
+
+    # --- column-type classification (forwarded to the sole table) -------- #
+
+    def classify_categorical_as_nominal(self) -> list[str]:
+        """Refine every unclassified categorical column on the sole table to nominal."""
+        return self._sole().classify_categorical_as_nominal()
+
+    def set_column_type(self, column: str, type: str) -> None:
+        """Set a column's type on the sole table (single-table sessions)."""
+        self._sole().set_column_type(column, type)
 
     @property
     def _store(self) -> Table | None:

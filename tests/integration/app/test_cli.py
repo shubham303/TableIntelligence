@@ -38,6 +38,9 @@ def test_full_chain_across_calls(tmp_path, cli_runner):
     _, joined = cli_runner(["--base", base, "join", "orders", "customers", "--session", key, "--name", "enriched"])
     assert joined["table"] == "enriched" and joined["n_rows"] == 80
 
+    # mock the LLM classification step before modeling (categorical columns exist)
+    cli_runner(["--base", base, "classify-as-nominal", "--session", key, "--table", "customers"])
+
     # train in one "process", evaluate in the next — model restored from disk
     _, trained = cli_runner(["--base", base, "train-classifier", "is_churned",
                              "--session", key, "--table", "customers", "--name", "churn"])
@@ -51,6 +54,8 @@ def test_associate_picks_test(tmp_path, cli_runner):
     base = str(tmp_path)
     _, load = cli_runner(["--base", base, "load", *copy_fixtures(tmp_path, "employees.csv")])
     key = load["session_key"]
+    # mock the LLM classification step (department is categorical)
+    cli_runner(["--base", base, "classify-as-nominal", "--session", key, "--table", "employees"])
     _, r = cli_runner(["--base", base, "associate", "department", "salary", "--session", key, "--table", "employees"])
     assert r["method"] in {"welch_t_test", "anova", "mann_whitney", "kruskal_wallis"}
 
@@ -99,6 +104,9 @@ def test_train_regressor_non_numeric_target(tmp_path, cli_runner, csv_writer):
     df = pd.DataFrame({"x": np.arange(30.0), "label": ["a", "b", "c"] * 10})
     _, load = cli_runner(["--base", base, "load", csv_writer(df, "d.csv")])
     key = load["session_key"]
+    # mock the LLM step (label is categorical); then train-regressor must still
+    # refuse a non-numeric target.
+    cli_runner(["--base", base, "classify-as-nominal", "--session", key, "--table", "d"])
     code, data = cli_runner(["--base", base, "train-regressor", "label", "--session", key, "--table", "d"])
     assert code == 1
     assert "numeric" in data["message"].lower()
@@ -111,6 +119,7 @@ def test_cli_explain_prediction(tmp_path, cli_runner, csv_writer):
                        "y": rng.integers(0, 2, 60)})
     _, load = cli_runner(["--base", base, "load", csv_writer(df, "d.csv")])
     key = load["session_key"]
+    cli_runner(["--base", base, "classify-as-nominal", "--session", key, "--table", "d"])
     cli_runner(["--base", base, "train-classifier", "y", "--session", key, "--table", "d", "--name", "m"])
     code, data = cli_runner(["--base", base, "explain", "--session", key, "--table", "d", "--model", "m", "--row", "0"])
     assert code == 0

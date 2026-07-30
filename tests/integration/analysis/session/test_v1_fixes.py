@@ -17,7 +17,9 @@ from tests.unit.factory import numeric_frame
 def test_small_table_float_is_continuous(tmp_path, csv_writer):
     df = pd.DataFrame({"grp": ["a", "b"] * 6, "measure": [float(i) + 0.5 for i in range(12)]})
     s = persistence.create_session([csv_writer(df, "d.csv")], base=tmp_path)
-    r = s.table("d").analyze_association("grp", "measure")
+    t = s.table("d")
+    t.classify_categorical_as_nominal()  # mock the LLM step (grp is categorical)
+    r = t.analyze_association("grp", "measure")
     # 'measure' must be treated as continuous -> a group test, not chi-square
     assert r.method in {"welch_t_test", "anova", "mann_whitney", "kruskal_wallis"}
 

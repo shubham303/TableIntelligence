@@ -143,6 +143,78 @@ def derived_columns(backend: Any, table_key: str) -> set[str]:
     return {r[0] for r in rows}
 
 
+# Persistent store of per-column types. Mirrors _DERIVED_REGISTRY: a sidecar
+# table in the same DuckDB file, keyed by (table_key, column_name), so it
+# survives reopen/_reattach for free (no persistence.py code). Unlike the
+# derived registry this one holds a value (the type string), and it is the
+# single source of truth for a column's type: classify_column reads it first
+# and writes back into it (cache-and-compute), and set_column_type (the LLM
+# tool) writes a refined value into it.
+_TYPE_REGISTRY = "_ti_column_types"
+
+
+def _ensure_type_registry(con: Any) -> None:
+    con.execute(
+        f"CREATE TABLE IF NOT EXISTS {quote_ident(_TYPE_REGISTRY)} "
+        f"(table_key VARCHAR, column_name VARCHAR, type VARCHAR)"
+    )
+
+
+def get_column_type(
+    backend: Any, table_key: str, column_name: str
+) -> str | None:
+    """Return the cached type for one column, or None if it has none yet."""
+    con = backend.con
+    _ensure_type_registry(con)
+    row = con.execute(
+        f"SELECT type FROM {quote_ident(_TYPE_REGISTRY)} "
+        f"WHERE table_key = ? AND column_name = ?",
+        [table_key, column_name],
+    ).fetchone()
+    return row[0] if row else None
+
+
+def set_column_type(
+    backend: Any, table_key: str, column_name: str, type_value: str
+) -> None:
+    """Upsert a column's type (DELETE then INSERT — idempotent on re-set)."""
+    con = backend.con
+    _ensure_type_registry(con)
+    con.execute(
+        f"DELETE FROM {quote_ident(_TYPE_REGISTRY)} "
+        f"WHERE table_key = ? AND column_name = ?",
+        [table_key, column_name],
+    )
+    con.execute(
+        f"INSERT INTO {quote_ident(_TYPE_REGISTRY)} VALUES (?, ?, ?)",
+        [table_key, column_name, type_value],
+    )
+
+
+def unset_column_type(
+    backend: Any, table_key: str, column_name: str
+) -> None:
+    """Clear a column's cached type so the next classify_column recomputes it."""
+    con = backend.con
+    _ensure_type_registry(con)
+    con.execute(
+        f"DELETE FROM {quote_ident(_TYPE_REGISTRY)} "
+        f"WHERE table_key = ? AND column_name = ?",
+        [table_key, column_name],
+    )
+
+
+def column_types(backend: Any, table_key: str) -> dict[str, str]:
+    """Return {column_name: type} for every typed column of the given table."""
+    con = backend.con
+    _ensure_type_registry(con)
+    rows = con.execute(
+        f"SELECT column_name, type FROM {quote_ident(_TYPE_REGISTRY)} WHERE table_key = ?",
+        [table_key],
+    ).fetchall()
+    return {r[0]: r[1] for r in rows}
+
+
 # Tokens that must never appear in a feature expression: statement/DDL keywords,
 # subquery starters, and functions that reach the filesystem or catalog. Matched
 # as whole words, case-insensitively — the guard for agent-authored SQL that runs

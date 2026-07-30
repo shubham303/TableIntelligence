@@ -47,6 +47,7 @@ def test_sessions_are_isolated(tmp_path):
                        "y": ([0, 1] * 10)})
     path = _csv(tmp_path, "iso.csv", df)
     s1 = Session.load(path)
+    s1.classify_categorical_as_nominal()  # mock the LLM step (y is low-card categorical)
     s1.cluster(n_clusters=2)
     s1.train_classifier("y", name="m1")
 
@@ -89,6 +90,7 @@ def test_write_back_length_mismatch_raises(tmp_path):
 def test_constant_value_column_association(tmp_path):
     df = pd.DataFrame({"grp": ["a", "a", "a", "b", "b", "b"], "val": [5.0] * 6})
     s = Session.load(_csv(tmp_path, "const.csv", df))
+    s.classify_categorical_as_nominal()  # mock the LLM step (grp is categorical)
     r = s.analyze_association("grp", "val")      # must not raise
     assert r.values["effect_size"] == 0.0
 

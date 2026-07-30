@@ -19,8 +19,11 @@ def _table(s: Session):
 
 
 def _features(store):
-    num, cat = _prep.feature_columns(store)
-    return set(num) | set(cat)
+    # Newly-derived categorical columns (bins, etc.) start unclassified; mock the
+    # LLM step so feature_columns can run (it errors on bare 'categorical').
+    store.classify_categorical_as_nominal()
+    num, nominal, ordinal = _prep.feature_columns(store)
+    return set(num) | set(nominal) | set(ordinal)
 
 
 # --------------------------------------------------------------------------- #

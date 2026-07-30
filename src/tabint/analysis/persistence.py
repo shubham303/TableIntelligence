@@ -27,15 +27,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ..session import Session
-from ..service.workspace import Workspace
+from .session import Session
+from .service.workspace import Workspace
 
 _SESSIONS_SUBDIR = Path(".tableint") / "sessions"
 
 # nanoid-style key: short, URL/filename-safe, collision-resistant. Alphanumeric
 # only (no -/_), so a key is safe as a directory name and a bare CLI argument.
 _NANOID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-_NANOID_SIZE = 12
+_NANOID_SIZE = 6
 
 
 def _root(base: str | Path | None) -> Path:

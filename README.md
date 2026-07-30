@@ -87,7 +87,7 @@ in every config below.
 
 | Variable | Required | Default | Purpose |
 | --- | --- | --- | --- |
-| `TABINT_API_KEY` | **yes** | — | Your `ti_…` key from `https://shubhamrandive.com/dashboard/account`. Absent → free role (all analytics still work; persisting reports/outreach to the dashboard needs an account, enforced server-side). |
+| `TABINT_API_KEY` | **yes** | — | Your `ti_…` key from `https://shubhamrandive.com/dashboard/account`. Absent → free role (all analytics still work; persisting reports to the dashboard needs an account, enforced server-side). |
 | `TABINT_CONTROL_PLANE_URL` | no | `https://shubhamrandive.com` | Base URL of the control plane (reports, folders, key validation). |
 | `TABULAR_BASE` | no | current dir | Where on-disk sessions are stored (`<base>/.tableint/sessions/`). |
 
@@ -254,5 +254,5 @@ complex multi-way transforms) remains upstream of where these algorithms begin.
 
 Apache License 2.0 — see [`LICENSE`](LICENSE). The distributed package (library,
 CLI, and MCP server) is fully open source. Monetization lives entirely in the
-hosted control plane (connectors, reports, outreach, and the Pro role), not in
+hosted platform (the Stripe connector, cloud reports, and the Pro role), not in
 the client software.

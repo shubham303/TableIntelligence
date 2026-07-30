@@ -24,8 +24,10 @@ def test_create_returns_session_key(tmp_path, csv_writer):
 def test_write_back_column_persists_across_open(tmp_path, csv_writer):
     s = persistence.create_session([csv_writer(numeric_frame(), "churn.csv")], base=tmp_path)
     sid = s.id
-    s.table("churn").cluster(n_clusters=2)          # writes a 'cluster' column
-    s.close()                                        # release the DB file
+    t = s.table("churn")
+    t.classify_categorical_as_nominal()  # mock the LLM step (y is low-card categorical)
+    t.cluster(n_clusters=2)               # writes a 'cluster' column
+    s.close()                             # release the DB file
 
     reopened = persistence.open_session(sid, base=tmp_path)
     assert "cluster" in reopened.table("churn").get_frame().columns

@@ -118,18 +118,27 @@ class TrainedModel:
         self,
         pipeline: Pipeline,
         numeric_features: list[str],
-        categorical_features: list[str],
         target: str,
         task: str,
         X_test: pd.DataFrame,
         y_test: pd.Series,
+        nominal_features: list[str] | None = None,
+        ordinal_features: list[str] | None = None,
+        categorical_features: list[str] | None = None,  # legacy pickled models
         backend: str = _DEFAULT_BACKEND,
         trust: honesty.Trust | None = None,
     ) -> None:
         self._pipeline = pipeline
         self._numeric_features = numeric_features
-        self._categorical_features = categorical_features
-        self._feature_names = numeric_features + categorical_features
+        self._nominal_features = nominal_features or []
+        self._ordinal_features = ordinal_features or []
+        # Legacy models pickled before the nominal/ordinal split carried a single
+        # categorical_features list; reconstruct nominal from it so old models
+        # still unpickle and explain. New models pass nominal/ordinal instead.
+        if categorical_features is not None and not self._nominal_features:
+            self._nominal_features = categorical_features
+        self._categorical_features = self._nominal_features + self._ordinal_features
+        self._feature_names = numeric_features + self._categorical_features
         self._target = target
         self._task = task  # "classification" | "regression"
         self._backend = backend  # "gbt" | "tabicl"
@@ -212,7 +221,8 @@ def _train(store: Any, target: str, task: str, backend: str = _DEFAULT_BACKEND):
     if target not in frame.columns:
         raise ValueError(f"Target column {target!r} not in table.")
 
-    numeric, categorical = _prep.feature_columns(store, exclude=(target,))
+    numeric, nominal, ordinal = _prep.feature_columns(store, exclude=(target,))
+    categorical = nominal + ordinal
     if not numeric and not categorical:
         raise ValueError("No usable feature columns to train on.")
 
@@ -258,7 +268,7 @@ def _train(store: Any, target: str, task: str, backend: str = _DEFAULT_BACKEND):
 
     # Neither trees nor TabICL need scaling; still impute + one-hot for uniform
     # handling and a fully numeric matrix the foundation model can consume.
-    pre = _prep.build_preprocessor(numeric, categorical, scale=False)
+    pre = _prep.build_preprocessor(numeric, nominal, ordinal, scale=False)
     estimator = _make_estimator(task, backend)
     pipeline = Pipeline([("pre", pre), ("model", estimator)])
 
@@ -277,7 +287,8 @@ def _train(store: Any, target: str, task: str, backend: str = _DEFAULT_BACKEND):
     return TrainedModel(
         pipeline=pipeline,
         numeric_features=numeric,
-        categorical_features=categorical,
+        nominal_features=nominal,
+        ordinal_features=ordinal,
         target=target,
         task=task,
         X_test=X_test,
